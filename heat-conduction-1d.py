@@ -1,6 +1,9 @@
 ###############################
+#        Heat Conduction      #
 # Finite Difference Method 1D #
 ###############################
+
+# Boundary Condition: fixed value
 
 import numpy as np
 import matplotlib.pyplot as plt
