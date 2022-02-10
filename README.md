@@ -2,8 +2,8 @@
 
 This repo is for developing pf models from scratch and improving understanding from perspectives of mathematics, computer science and material science.
 
-Language: Python
-The reason of choosing this language is because it is close to matlab, which I used beofre. Efforts will be made to improve the performace of the python code comparing to C++.
+Language: C++, Python
+C++ does the compuation and python does the visualization
 
 Reference of numerical Model:
 
