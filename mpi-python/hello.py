@@ -2,8 +2,8 @@
 from mpi4py import MPI
 import numpy as np
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
+# comm = MPI.COMM_WORLD
+# rank = comm.Get_rank()
 # print("My rank is", rank)
 
 # if rank == 0:
@@ -57,3 +57,27 @@ rank = comm.Get_rank()
 # comm.Bcast(data, root=0)  # broadcast the array from rank 0 to all others
 
 # print('Rank: ', rank, ', data received: ', data)
+
+globalData = None
+
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+
+for i in range(2):
+    numDataPerRank = 10
+    sendbuf = np.linspace(rank*numDataPerRank+1, (rank+1)
+                          * numDataPerRank, numDataPerRank)
+    print('Rank: ', rank, ', sendbuf: ', sendbuf)
+
+    recvbuf = None
+    if rank == 0:
+        recvbuf = np.empty(numDataPerRank*size, dtype='d')
+
+    comm.Gather(sendbuf, recvbuf, root=0)
+
+    if rank == 0:
+        # globalData = recvbuf
+        print('Rank: ', rank, ', recvbuf received: ', recvbuf)
+
+print(globalData)
