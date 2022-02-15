@@ -22,13 +22,12 @@ nprint = 1000
 # parameters of materials
 tau = 0.0003
 epsilonb = 0.01
-delta = 0.05
+delta = 0.02
 aniso = 4.0
 theta0 = math.pi/4.0
 
 # initialize the seed
 phi = np.zeros((Nx, Ny))
-# thetaa = np.zeros((Nx, Ny))
 lap_phi = np.zeros((Nx, Ny))
 phidx = np.zeros((Nx, Ny))
 phidy = np.zeros((Nx, Ny))
@@ -44,7 +43,7 @@ for i in range(Nx):
 for istep in range(nstep):
     if (istep == 0) or ((istep+1) % nprint == 0):
         plt.matshow(phi)
-        plt.savefig(f"figure-delta002-m005-theta-0/2d{istep+1}")
+        plt.savefig(f"figure-delta002-m005/2d{istep+1}")
     for i in range(1, Nx-1):
         for j in range(1, Ny-1):
             jp = j+1
@@ -68,23 +67,20 @@ for istep in range(nstep):
             phidx[i][j] = (phi[ip][j] - phi[im][j])/(2.0*dx)
             phidy[i][j] = (phi[i][jp] - phi[i][jm])/(2.0*dx)
 
-            # thetaa[i][j] = math.atan(phidy[i][j]/phidx[i][j])
-            if phidx[i][j] == 0:
+            if phidx[i][j] == 0.0:
                 theta = math.atan(phidy[i][j]/1.0e-6)
-            else:
-                theta = math.atan(phidy[i][j]/phidx[i][j])
+            elif phidx[i][j] == 0.0 and phidy[i][j] > 0.0:
+                theta = math.pi/2.0
+            elif phidx[i][j] == 0.0 and phidy[i][j] < 0.0:
+                theta = -1.0*math.pi/2
+            elif phidx[i][j] == 0.0 and phidy[i][j] == 0.0:
+                theta = 0.0
 
             # epsilon and its derivative
             epsilon[i][j] = epsilonb * \
                 (1.0 + delta*math.cos(aniso*(theta-theta0)))
             epsilon_deriv[i][j] = -1*epsilonb*aniso * \
                 delta*math.sin(aniso*(theta-theta0))
-
-    # plt.matshow(epsilon)
-    # print(thetaa[:][50])
-    # plt.matshow(thetaa)
-    # plt.colorbar()
-    # plt.show()
 
     for i in range(1, Nx-1):
         for j in range(1, Ny-1):
