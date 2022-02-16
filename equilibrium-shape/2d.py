@@ -27,10 +27,9 @@ tau = 0.0003
 epsilonb = 0.01
 delta = 0.05
 aniso = 2.0
-# theta0 = math.pi/4.0
 theta0 = 0.0
+
 # initialize the seed
-# thetaa = np.zeros((Nx, Ny))
 phi = np.zeros((Nx, Ny))
 lap_phi = np.zeros((Nx, Ny))
 phidx = np.zeros((Nx, Ny))
@@ -93,10 +92,6 @@ for istep in range(nstep):
                 epsilon_deriv[i][j] = -1*epsilonb*aniso * \
                     delta*math.sin(aniso*(theta-theta0))
 
-    # plt.matshow(thetaa)
-    # plt.colorbar()
-    # plt.show()
-
     for i in range(1, Nx-1):
         for j in range(1, Ny-1):
             jp = j+1
@@ -122,8 +117,3 @@ for istep in range(nstep):
 
                 phi[i][j] = phi[i][j] + (dtime/tau)*(term1 + term2 + (
                     epsilon[i][j]**2)*lap_phi[i][j] + phi[i][j]*(1.0-phi[i][j])*(phi[i][j]-0.45))
-
-# plt.matshow(phi)
-# print(phi[:][32])
-# plt.colorbar()
-# plt.show()
