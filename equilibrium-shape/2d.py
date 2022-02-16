@@ -117,3 +117,8 @@ for istep in range(nstep):
 
                 phi[i][j] = phi[i][j] + (dtime/tau)*(term1 + term2 + (
                     epsilon[i][j]**2)*lap_phi[i][j] + phi[i][j]*(1.0-phi[i][j])*(phi[i][j]-0.45))
+
+            if phi[i][j] > 0.9999:
+                phi[i][j] = 1.0
+            elif phi[i][j] < 0.0001:
+                phi[i][j] = 0.0
