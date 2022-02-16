@@ -13,21 +13,21 @@ import time
 t0 = time.time()
 
 # parameters of calculation
-Nx = 64
-Ny = 64
+Nx = 128
+Ny = 128
 NxNy = Nx*Ny
 dx = 0.03
 dy = 0.03
 dtime = 1.0e-4
 nstep = 4000
-nprint = 1000
+nprint = 200
 
 # parameters of materials
 tau = 0.0003
-epsilonb = 0.01
-delta = 0.05
-aniso = 2.0
-theta0 = 0.0
+epsilonb = 0.016
+delta = 0.15
+aniso = 4.0
+theta0 = math.pi/4.0
 
 # initialize the seed
 phi = np.zeros((Nx, Ny))
