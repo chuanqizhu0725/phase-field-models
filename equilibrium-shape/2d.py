@@ -8,10 +8,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import time
+
+t0 = time.time()
 
 # parameters of calculation
-Nx = 100
-Ny = 100
+Nx = 64
+Ny = 64
 NxNy = Nx*Ny
 dx = 0.03
 dy = 0.03
@@ -22,11 +25,12 @@ nprint = 1000
 # parameters of materials
 tau = 0.0003
 epsilonb = 0.01
-delta = 0.02
-aniso = 4.0
-theta0 = math.pi/4.0
-
+delta = 0.05
+aniso = 2.0
+# theta0 = math.pi/4.0
+theta0 = 0.0
 # initialize the seed
+# thetaa = np.zeros((Nx, Ny))
 phi = np.zeros((Nx, Ny))
 lap_phi = np.zeros((Nx, Ny))
 phidx = np.zeros((Nx, Ny))
@@ -41,9 +45,15 @@ for i in range(Nx):
             phi[i][j] = 1.0
 
 for istep in range(nstep):
+    if istep == 0:
+        print("*****************************\ncomputation starts!")
+    if istep % 200 == 0 and istep > 0:
+        print(
+            f"run {istep-199}~{istep} steps of {nstep}, {time.time()-t0} has passed")
     if (istep == 0) or ((istep+1) % nprint == 0):
         plt.matshow(phi)
-        plt.savefig(f"figure-delta002-m005/2d{istep+1}")
+        plt.colorbar()
+        plt.savefig(f"figure-new-params/2d{istep+1}")
     for i in range(1, Nx-1):
         for j in range(1, Ny-1):
             jp = j+1
@@ -63,24 +73,29 @@ for istep in range(nstep):
             lap_phi[i][j] = (phi[im][j] + phi[ip][j] + phi[i]
                              [jm] + phi[i][jp] - 4.0*phi[i][j])/(dx*dy)
 
-            # gradients of phi
-            phidx[i][j] = (phi[ip][j] - phi[im][j])/(2.0*dx)
-            phidy[i][j] = (phi[i][jp] - phi[i][jm])/(2.0*dx)
+            if lap_phi[i][j] != 0.0:
+                # gradients of phi
+                phidx[i][j] = (phi[ip][j] - phi[im][j])/(2.0*dx)
+                phidy[i][j] = (phi[i][jp] - phi[i][jm])/(2.0*dy)
 
-            if phidx[i][j] == 0.0:
-                theta = math.atan(phidy[i][j]/1.0e-6)
-            elif phidx[i][j] == 0.0 and phidy[i][j] > 0.0:
-                theta = math.pi/2.0
-            elif phidx[i][j] == 0.0 and phidy[i][j] < 0.0:
-                theta = -1.0*math.pi/2
-            elif phidx[i][j] == 0.0 and phidy[i][j] == 0.0:
-                theta = 0.0
+                if phidx[i][j] != 0.0:
+                    theta = math.atan(phidy[i][j]/phidx[i][j])
+                elif phidx[i][j] == 0.0 and phidy[i][j] > 0.0:
+                    theta = math.pi/2.0
+                elif phidx[i][j] == 0.0 and phidy[i][j] < 0.0:
+                    theta = -1.0*math.pi/2
+                elif phidx[i][j] == 0.0 and phidy[i][j] == 0.0:
+                    theta = 0.0
 
-            # epsilon and its derivative
-            epsilon[i][j] = epsilonb * \
-                (1.0 + delta*math.cos(aniso*(theta-theta0)))
-            epsilon_deriv[i][j] = -1*epsilonb*aniso * \
-                delta*math.sin(aniso*(theta-theta0))
+                # epsilon and its derivative
+                epsilon[i][j] = epsilonb * \
+                    (1.0 + delta*math.cos(aniso*(theta-theta0)))
+                epsilon_deriv[i][j] = -1*epsilonb*aniso * \
+                    delta*math.sin(aniso*(theta-theta0))
+
+    # plt.matshow(thetaa)
+    # plt.colorbar()
+    # plt.show()
 
     for i in range(1, Nx-1):
         for j in range(1, Ny-1):
@@ -97,11 +112,18 @@ for istep in range(nstep):
             if im == -1:
                 im = Nx-1
 
-            term1 = (epsilon[i][jp]*epsilon_deriv[i][jp]*phidx[i][jp] -
-                     epsilon[i][jm]*epsilon_deriv[i][jm]*phidx[i][jm])/(2.0*dy)
+            if lap_phi[i][j] != 0.0:
 
-            term2 = (epsilon[ip][j]*epsilon_deriv[ip][j]*phidx[ip][j] -
-                     epsilon[im][j]*epsilon_deriv[im][j]*phidx[im][j])/(2.0*dx)
+                term1 = (epsilon[i][jp]*epsilon_deriv[i][jp]*phidx[i][jp] -
+                         epsilon[i][jm]*epsilon_deriv[i][jm]*phidx[i][jm])/(2.0*dy)
 
-            phi[i][j] = phi[i][j] + (dtime/tau)*(term1 + term2 + (
-                epsilon[i][j]**2)*lap_phi[i][j] + phi[i][j]*(1.0-phi[i][j])*(phi[i][j]-0.45))
+                term2 = -(epsilon[ip][j]*epsilon_deriv[ip][j]*phidy[ip][j] -
+                          epsilon[im][j]*epsilon_deriv[im][j]*phidy[im][j])/(2.0*dx)
+
+                phi[i][j] = phi[i][j] + (dtime/tau)*(term1 + term2 + (
+                    epsilon[i][j]**2)*lap_phi[i][j] + phi[i][j]*(1.0-phi[i][j])*(phi[i][j]-0.45))
+
+# plt.matshow(phi)
+# print(phi[:][32])
+# plt.colorbar()
+# plt.show()
