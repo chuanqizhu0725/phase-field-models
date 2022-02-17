@@ -7,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <typeinfo>
 
 using namespace std;
 
@@ -34,9 +35,9 @@ int i, j, k, l, ii, jj, kk, ll, it; //整数
 int ip, im, jp, jm;                 //整数
 int n1, n2, n3;                     //整数
 
-int istep;
+int istep = 0;
 // int n000;		//位置(i,j)において、pが０ではない方位の個数（n00>=n000）
-double nstep; //計算カウント数の最大値（計算終了カウント）
+int nstep; //計算カウント数の最大値（計算終了カウント）
 double dtime, L, b0;
 double M0;               //粒界の易動度
 double W0;               //ペナルティー項の係数
@@ -53,6 +54,7 @@ double vm0;    //モル体積
 
 void initialize();
 void datasave(int step);
+void datain();
 
 //************ 初期場(フェーズフィールド)の設定サブルーチン *************
 void initialize()
@@ -181,4 +183,54 @@ void datasave(int step)
         }
     }
     fclose(stream); //ファイルをクローズ
+}
+
+void datain()
+{
+    // Create a text string, which is used to output the text file
+    string lineText;
+    string paraText;
+    string dataText;
+    string delimiter = "#";
+
+    // Read from the text file
+    ifstream inputfile("input.txt");
+
+    // Use a while loop together with the getline() function to read the file line by line
+    while (getline(inputfile, lineText))
+    {
+        // Output the text from the file
+        paraText = lineText.substr(0, lineText.find(delimiter));
+        dataText = lineText.substr(lineText.find(delimiter) + 1);
+        if (paraText == "nstep")
+        {
+            nstep = stoi(dataText);
+        }
+        else if (paraText == "dtime")
+        {
+            dtime = stod(dataText);
+        }
+        else if (paraText == "temp")
+        {
+            temp = stod(dataText);
+        }
+        else if (paraText == "L")
+        {
+            L = stod(dataText);
+        }
+        else if (paraText == "vm0")
+        {
+            vm0 = stod(dataText);
+        }
+        else if (paraText == "delta")
+        {
+            delta = stod(dataText);
+        }
+        else if (paraText == "mobi")
+        {
+            mobi = stod(dataText);
+        }
+    }
+    // Close the file
+    inputfile.close();
 }
