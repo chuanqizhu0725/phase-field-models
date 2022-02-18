@@ -1,0 +1,275 @@
+// Adapted from Prof. Koyama's MPF code in his textbook
+// Author: Chuanqi Zhu
+// Created on: 2022/2/16
+
+#include "header.h"
+
+//******* メインプログラム ******************************************
+int main(void)
+{
+    datain();
+
+    dx = L / (double)ND * 1.0e-9;        //差分プロック１辺の長さ(m)
+    gamma0 = 0.5 * vm0 / RR / temp / dx; //粒界エネルギ密度（0.5J/m^2）を無次元化
+    A0 = 8.0 * delta * gamma0 / PI / PI; //勾配エネルギー係数[式(4.40)]
+    W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
+    M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
+    F0 = 50.0 / RR / temp;               //粒界移動の駆動力
+
+    initialize();
+
+    log();
+
+start:;
+
+    if ((((int)(istep) % 500) == 0))
+    {
+        datasave(istep);
+    }
+
+    //**** 各差分プロックにおけるphiNum[i][j]とphiIdx[n00][i][j]を調査 *********************
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            ip = i + 1;
+            im = i - 1;
+            jp = j + 1;
+            jm = j - 1;
+            if (i == ndm)
+            {
+                ip = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+            } //周期的境界条件
+            if (j == ndm)
+            {
+                jp = 0;
+            }
+            if (j == 0)
+            {
+                jm = ndm;
+            }
+
+            //--- 位置(i,j)およびその周囲(i±1,j±1)において、pが０ではない方位の個数---
+            phinum = 0;
+            for (ii = 1; ii <= nm; ii++)
+            {
+                if ((phi[ii][i][j] > 0.0) ||
+                    ((phi[ii][i][j] == 0.0) && (phi[ii][ip][j] > 0.0) ||
+                     (phi[ii][im][j] > 0.0) ||
+                     (phi[ii][i][jp] > 0.0) ||
+                     (phi[ii][i][jm] > 0.0)))
+                {
+                    phinum++;
+                    phiIdx[phinum][i][j] = ii;
+                    // printf("%d  ", n00);
+                }
+            }
+            phiNum[i][j] = phinum;
+        }
+    }
+
+    // Evolution Equations
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            ip = i + 1;
+            ipp = i + 2;
+            im = i - 1;
+            imm = i - 2;
+            jp = j + 1;
+            jpp = j + 2;
+            jm = j - 1;
+            jmm = j - 2;
+            if (i == ndm)
+            {
+                ip = 0;
+                ipp = 1;
+            }
+            if (i == ndm - 1)
+            {
+                ipp = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+                imm = ndm - 1;
+            } //周期的境界条件
+            if (i == 1)
+            {
+                imm = ndm;
+            }
+            if (j == ndm)
+            {
+                jp = 0;
+                jpp = 1;
+            }
+            if (j == ndm - 1)
+            {
+                jpp = 0;
+            }
+            if (j == 0)
+            {
+                jm = ndm;
+                jmm = ndm - 1;
+            }
+            if (j == 1)
+            {
+                jmm = ndm;
+            }
+
+            for (n1 = 1; n1 <= phiNum[i][j]; n1++)
+            {
+                ii = phiIdx[n1][i][j];
+                pddtt = 0.0;
+                for (n2 = 1; n2 <= phiNum[i][j]; n2++)
+                {
+                    jj = phiIdx[n2][i][j];
+                    sum1 = 0.0;
+                    for (n3 = 1; n3 <= phiNum[i][j]; n3++)
+                    {
+                        kk = phiIdx[n3][i][j];
+
+                        lap_phi = phi[kk][ip][j] + phi[kk][im][j] + phi[kk][i][jp] + phi[kk][i][jm] - 4.0 * phi[kk][i][j];
+
+                        epsilon0 = sqrt(aij[ii][kk]);
+                        theta0 = thij[ii][kk];
+                        if (anij[ii][kk])
+                        {
+                            // iikk-ijp
+                            phidxijp = (phi[kk][ip][jp] - phi[kk][im][jp]) / 2.0;
+                            phidyijp = (phi[kk][i][jpp] - phi[kk][i][j]) / 2.0;
+                            theta = calcTheta(phidyijp, phidxijp);
+                            epsilonijp = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivijp = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            // iikk-ijm
+                            phidxijm = (phi[kk][ip][jm] - phi[kk][im][jm]) / 2.0;
+                            phidyijm = (phi[kk][i][j] - phi[kk][i][jmm]) / 2.0;
+                            theta = calcTheta(phidyijm, phidxijm);
+                            epsilonijm = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivijm = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            //***iikk-ij-dy***
+                            termiikk1 = (epsilonijp * epsilon_derivijp * phidxijp - epsilonijm * epsilon_derivijm * phidxijm) / 2.0;
+
+                            // iikk-ipj
+                            phidxipj = (phi[kk][ipp][j] - phi[kk][i][j]) / 2.0;
+                            phidyipj = (phi[kk][ip][jp] - phi[kk][ip][jm]) / 2.0;
+                            theta = calcTheta(phidyipj, phidxipj);
+                            epsilonipj = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivipj = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            // iikk-imj
+                            phidximj = (phi[kk][i][j] - phi[kk][imm][j]) / 2.0;
+                            phidyimj = (phi[kk][im][jp] - phi[kk][im][jm]) / 2.0;
+                            theta = calcTheta(phidyimj, phidximj);
+                            epsilonimj = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivimj = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            //***iikk-ij-dx***
+                            termiikk2 = -1.0 * (epsilonipj * epsilon_derivipj * phidxipj - epsilonimj * epsilon_derivimj * phidximj) / 2.0;
+
+                            termiikk = aij[ii][kk] * lap_phi + termiikk1 + termiikk2;
+                        }
+                        else
+                        {
+                            termiikk = aij[ii][kk] * lap_phi;
+                        }
+
+                        epsilon0 = sqrt(aij[jj][kk]);
+                        theta0 = thij[jj][kk];
+                        if (anij[jj][kk])
+                        {
+                            // jjkk-ijp
+                            phidxijp = (phi[kk][ip][jp] - phi[kk][im][jp]) / 2.0;
+                            phidyijp = (phi[kk][i][jpp] - phi[kk][i][j]) / 2.0;
+                            theta = calcTheta(phidyijp, phidxijp);
+                            epsilonijp = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivijp = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            // jjkk-ijm
+                            phidxijm = (phi[kk][ip][jm] - phi[kk][im][jm]) / 2.0;
+                            phidyijm = (phi[kk][i][j] - phi[kk][i][jmm]) / 2.0;
+                            theta = calcTheta(phidyijm, phidxijm);
+                            epsilonijm = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivijm = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            //***iikk-ij-dy***
+                            termjjkk1 = (epsilonijp * epsilon_derivijp * phidxijp - epsilonijm * epsilon_derivijm * phidxijm) / 2.0;
+
+                            // jjkk-ipj
+                            phidxipj = (phi[kk][ipp][j] - phi[kk][i][j]) / 2.0;
+                            phidyipj = (phi[kk][ip][jp] - phi[kk][ip][jm]) / 2.0;
+                            theta = calcTheta(phidyipj, phidxipj);
+                            epsilonipj = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivipj = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            // jjkk-imj
+                            phidximj = (phi[kk][i][j] - phi[kk][imm][j]) / 2.0;
+                            phidyimj = (phi[kk][im][jp] - phi[kk][im][jm]) / 2.0;
+                            theta = calcTheta(phidyimj, phidximj);
+                            epsilonimj = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));
+                            epsilon_derivimj = -1.0 * epsilon0 * 4.0 * astre * sin(4.0 * (theta - theta0));
+                            //***jjkk-ij-dx***
+                            termjjkk2 = -1.0 * (epsilonipj * epsilon_derivipj * phidxipj - epsilonimj * epsilon_derivimj * phidximj) / 2.0;
+
+                            termjjkk = aij[jj][kk] * lap_phi + termjjkk1 + termjjkk2;
+                        }
+                        else
+                        {
+                            termjjkk = aij[jj][kk] * lap_phi;
+                        }
+
+                        sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j]; //[式(4.31)の一部]
+                    }
+                    pddtt += -2.0 * mij[ii][jj] / double(phiNum[i][j]) * (sum1 - 8.0 / PI * fij[ii][jj] * sqrt(phi[ii][i][j] * phi[jj][i][j]));
+                    //フェーズフィールドの発展方程式[式(4.31)]
+                }
+                phi2[ii][i][j] = phi[ii][i][j] + pddtt * dtime; //フェーズフィールドの時間発展（陽解法）
+                if (phi2[ii][i][j] >= 1.0)
+                {
+                    phi2[ii][i][j] = 1.0;
+                } //フェーズフィールドの変域補正
+                if (phi2[ii][i][j] <= 0.0)
+                {
+                    phi2[ii][i][j] = 0.0;
+                }
+            }
+        } // j
+    }     // i
+
+    for (k = 1; k <= nm; k++)
+    {
+        for (i = 0; i <= ndm; i++)
+        {
+            for (j = 0; j <= ndm; j++)
+            {
+                phi[k][i][j] = phi2[k][i][j];
+            }
+        }
+    }
+
+    //
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            sum1 = 0.0;
+            for (k = 1; k <= nm; k++)
+            {
+                sum1 += phi[k][i][j];
+            }
+            for (k = 1; k <= nm; k++)
+            {
+                phi[k][i][j] = phi[k][i][j] / sum1;
+            }
+        }
+    }
+
+    istep = istep + 1.;
+    if (istep < nstep)
+    {
+        goto start;
+    }
+
+end:;
+    return 0;
+}
