@@ -22,7 +22,7 @@ int main(void)
 
 start:;
 
-    if ((((int)(istep) % 1000) == 0))
+    if ((((int)(istep) % pstep) == 0))
     {
         datasave(istep);
     }
@@ -218,7 +218,7 @@ start:;
         }
     }
 
-    istep = istep + 1.;
+    istep = istep + 1;
     if (istep < nstep)
     {
         goto start;

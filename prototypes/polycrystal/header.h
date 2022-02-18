@@ -22,15 +22,8 @@ int nm = N - 1, nmm = N - 2; //考慮する結晶方位の数、N-2（考慮す�
 double PI = 3.141592;        //π、計算カウント数
 double RR = 8.3145;          //ガス定数
 
-// double lap_phi;
-// double phidxipj, phidyipj, phidximj, phidyimj;
-// double phidxijp, phidyijp, phidxijm, phidyijm;
 double theta, theta0;
 double epsilon0;
-// double epsilonipj, epsilon_derivipj, epsilonimj, epsilon_derivimj;
-// double epsilonijp, epsilon_derivijp, epsilonijm, epsilon_derivijm;
-// double termiikk1, termiikk2;
-// double termjjkk1, termjjkk2;
 double termiikk, termjjkk;
 
 double phidx, phidy, phidxx, phidyy, phidxy;
@@ -55,7 +48,8 @@ int n1, n2, n3;                         //整数
 
 int istep = 0;
 // int n000;		//位置(i,j)において、pが０ではない方位の個数（n00>=n000）
-int nstep;               //計算カウント数の最大値（計算終了カウント）
+int nstep; //計算カウント数の最大値（計算終了カウント）
+int pstep;
 double dtime, L, dx;     // L計算領域の一辺の長さ(nm), 差分プロック１辺の長さ(m)
 double M0;               //粒界の易動度
 double W0;               //ペナルティー項の係数
@@ -127,12 +121,6 @@ void initialize()
             }
         }
     }
-
-    // thij[1][3] = PI / 10.0;
-    // thij[3][1] = PI / 10.0;
-    // thij[2][3] = PI / 5.0;
-    // thij[3][2] = PI / 5.0;
-    // thij[2][1] = PI / (-8.0);
 
     //*** 初期場の設定 *****************************************
     for (k = 1; k <= nm; k++)
@@ -242,6 +230,10 @@ void datain()
         if (paraText == "nstep")
         {
             nstep = stoi(dataText);
+        }
+        else if (paraText == "pstep")
+        {
+            pstep = stoi(dataText);
         }
         else if (paraText == "dtime")
         {
