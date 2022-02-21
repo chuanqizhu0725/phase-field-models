@@ -1,0 +1,9 @@
+nstep#5001
+pstep#1000
+dtime#2.0
+temp#1000.0
+L#2000.0
+vm0#7.0e-6
+delta#7.0
+mobi#1.0
+astre#0.05
