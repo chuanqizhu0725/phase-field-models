@@ -16,7 +16,7 @@ Reference of numerical Model:
 
 The principles of developing reusable, expandable, managable problems are:
 
-- Do no repeat yourself
+- Do not repeat yourself
   when a block of code are used in different places, put it in a sigle file and call it from other files
 - Modularization and Object Orientation Programming
   This is for building new models more effectively and make degugging easier
