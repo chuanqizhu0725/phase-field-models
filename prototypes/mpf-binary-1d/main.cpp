@@ -1,6 +1,6 @@
 // Adapted from Prof. Koyama's MPF code in his textbook
 // Author: Chuanqi Zhu
-// Created on: 2022/2/18
+// Created on: 2022/2/21
 
 #include "header.h"
 
@@ -14,14 +14,15 @@ int main(void)
     A0 = 8.0 * delta * gamma0 / PI / PI; //勾配エネルギー係数[式(4.40)]
     W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
     M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
-    F0 = 80.0 / RR / temp;               //粒界移動の駆動力
+    F0 = 20.0 / RR / temp;               //粒界移動の駆動力
 
     A_alph = 1.0e+02 / RR / temp;
     c_alph0 = 0.1; //化学的自由エネルギー内のパラメータ
     A_beta = 1.0e+02 / RR / temp;
     c_beta0 = 0.4;
-    Da = 0.02; //各相の拡散係数は全て等しいと仮定
+    Da = 0.08; //各相の拡散係数は全て等しいと仮定
     Db = 0.1;
+    c0 = 0.2;
 
     initialize();
 
@@ -98,6 +99,8 @@ start:;
             sb = sbh[i][j] = sum1; // Sβの計算[式(4.46)]
 
             //局所平衡組成の計算[式(4.47)]
+            // cah[i][j] = 0.1;
+            // cbh[i][j] = 0.4;
             cah[i][j] = (A_beta * c + (A_alph * c_alph0 - A_beta * c_beta0) * sb) / (A_beta * sa + A_alph * sb);
             cbh[i][j] = (A_alph * c + (A_beta * c_beta0 - A_alph * c_alph0) * sa) / (A_beta * sa + A_alph * sb);
             if (cah[i][j] >= 1.0)
