@@ -20,7 +20,7 @@ int main(void)
     c_alph0 = 0.1; //化学的自由エネルギー内のパラメータ
     A_beta = 1.0e+02 / RR / temp;
     c_beta0 = 0.4;
-    Da = 0.001; //各相の拡散係数は全て等しいと仮定
+    Da = 0.001;
     Db = 0.005;
 
     initialize();
@@ -199,22 +199,10 @@ start:;
                     }
                     if (ii != nm && jj == nm)
                     {
-                        // cii = cah[i][j];
-                        // cjj = cbh[i][j];
-                        // gii = A_alph * (cii - c_alph0) * (cii - c_alph0);
-                        // gjj = A_beta * (cjj - c_beta0) * (cjj - c_beta0) + 40.0 / RR / temp;
-                        // ptl = 2.0 * A_alph * (cii - c_alph0);
-                        // dF = gii - gjj - ptl * (cii - cjj);
                         dF = (450.0 - 1200.0 * cbh[i][j]) / RR / temp;
                     }
                     else if (ii == nm && jj != nm)
                     {
-                        // cii = cbh[i][j];
-                        // cjj = cah[i][j];
-                        // gii = A_beta * (cii - c_beta0) * (cii - c_beta0) + 40.0 / RR / temp;
-                        // gjj = A_alph * (cjj - c_alph0) * (cjj - c_alph0);
-                        // ptl = 2.0 * A_alph * (cjj - c_alph0);
-                        // dF = gii - gjj - ptl * (cii - cjj);
                         dF = -(450.0 - 1200.0 * cbh[i][j]) / RR / temp;
                     }
                     else
@@ -270,8 +258,7 @@ start:;
             dev2_a = sah[i][j] * (cah[ip][j] + cah[im][j] + cah[i][jp] + cah[i][jm] - 4.0 * cah[i][j]);
             dev2_b = sbh[i][j] * (cbh[ip][j] + cbh[im][j] + cbh[i][jp] + cbh[i][jm] - 4.0 * cbh[i][j]);
 
-            cddtt = Da * (dev1_a + dev2_a) + Db * (dev1_b + dev2_b); //拡散方程式[式(4.42)]
-            // ch2[i][j]=ch[i][j]+cddtt*delt;	//濃度場の時間発展(陽解法)
+            cddtt = Da * (dev1_a + dev2_a) + Db * (dev1_b + dev2_b);             //拡散方程式[式(4.42)]
             ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
         }
     }
