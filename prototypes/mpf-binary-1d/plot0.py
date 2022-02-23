@@ -7,5 +7,6 @@ arr = df.values
 mat = arr.reshape(100, 100)
 plt.figure(figsize=(10, 2))
 plt.plot(mat[25, :])
+# plt.figure(figsize=(5, 5))
 # plt.matshow(mat)
 plt.show()

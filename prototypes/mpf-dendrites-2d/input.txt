@@ -1,5 +1,5 @@
-nstep#2001
-pstep#500
+nstep#20001
+pstep#2500
 dtime#2.0
 temp#1000.0
 L#2000.0

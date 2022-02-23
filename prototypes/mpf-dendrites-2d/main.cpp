@@ -1,6 +1,6 @@
-// Adapted from Prof. Koyama's MPF code in his textbook
+// Adapted from polycrystal-binary
 // Author: Chuanqi Zhu
-// Created on: 2022/2/21
+// Created on: 2022/2/22
 
 #include "header.h"
 
@@ -14,14 +14,14 @@ int main(void)
     A0 = 8.0 * delta * gamma0 / PI / PI; //勾配エネルギー係数[式(4.40)]
     W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
     M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
-    F0 = 20.0 / RR / temp;               //粒界移動の駆動力
+    F0 = 80.0 / RR / temp;               //粒界移動の駆動力
 
     A_alph = 1.0e+02 / RR / temp;
     c_alph0 = 0.1; //化学的自由エネルギー内のパラメータ
     A_beta = 1.0e+02 / RR / temp;
     c_beta0 = 0.4;
-    Da = 0.02; //各相の拡散係数は全て等しいと仮定
-    Db = 0.1;
+    Da = 0.001; //各相の拡散係数は全て等しいと仮定
+    Db = 0.005;
 
     initialize();
 
@@ -76,6 +76,46 @@ start:;
                 }
             }
             phiNum[i][j] = phinum;
+        }
+    }
+
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            c = ch[i][j]; //濃度場
+            sum1 = 0.0;
+            for (ii = 1; ii <= nm - 1; ii++)
+            {
+                sum1 += phi[ii][i][j];
+            }
+            sa = sah[i][j] = sum1; // Sαの計算[式(4.46)]
+            sum1 = 0.0;
+            for (ii = nm; ii <= nm; ii++)
+            {
+                sum1 += phi[ii][i][j];
+            }
+            sb = sbh[i][j] = sum1; // Sβの計算[式(4.46)]
+
+            //局所平衡組成の計算[式(4.47)]
+            cah[i][j] = (A_beta * c + (A_alph * c_alph0 - A_beta * c_beta0) * sb) / (A_beta * sa + A_alph * sb);
+            cbh[i][j] = (A_alph * c + (A_beta * c_beta0 - A_alph * c_alph0) * sa) / (A_beta * sa + A_alph * sb);
+            if (cah[i][j] >= 1.0)
+            {
+                cah[i][j] = 1.0;
+            }
+            if (cah[i][j] <= 0.0)
+            {
+                cah[i][j] = 0.0;
+            } //濃度場の変域補正
+            if (cbh[i][j] >= 1.0)
+            {
+                cbh[i][j] = 1.0;
+            }
+            if (cbh[i][j] <= 0.0)
+            {
+                cbh[i][j] = 0.0;
+            }
         }
     }
 
@@ -157,25 +197,31 @@ start:;
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j]; //[式(4.31)の一部]
                     }
-
-                    // calculate driving force base on new concentration field of the liquid within the interface
-                    // based on the linear liquidus line in phase diagram
-                    if (ii == nm && jj != nm)
+                    if (ii != nm && jj == nm)
                     {
-                        // driving force arises according to the thermodynamic rule
-                        dF = -(160.0 - 400.0 * cbh[i][j]) / RR / temp;
-                        // dF = 10.0 / RR / temp;
+                        // cii = cah[i][j];
+                        // cjj = cbh[i][j];
+                        // gii = A_alph * (cii - c_alph0) * (cii - c_alph0);
+                        // gjj = A_beta * (cjj - c_beta0) * (cjj - c_beta0) + 40.0 / RR / temp;
+                        // ptl = 2.0 * A_alph * (cii - c_alph0);
+                        // dF = gii - gjj - ptl * (cii - cjj);
+                        dF = (450.0 - 1200.0 * cbh[i][j]) / RR / temp;
                     }
-                    else if (ii != nm && jj == nm)
+                    else if (ii == nm && jj != nm)
                     {
-                        dF = (160.0 - 400.0 * cbh[i][j]) / RR / temp;
-                        // dF = -10.0 / RR / temp;
+                        // cii = cbh[i][j];
+                        // cjj = cah[i][j];
+                        // gii = A_beta * (cii - c_beta0) * (cii - c_beta0) + 40.0 / RR / temp;
+                        // gjj = A_alph * (cjj - c_alph0) * (cjj - c_alph0);
+                        // ptl = 2.0 * A_alph * (cjj - c_alph0);
+                        // dF = gii - gjj - ptl * (cii - cjj);
+                        dF = -(450.0 - 1200.0 * cbh[i][j]) / RR / temp;
                     }
                     else
                     {
                         dF = 0.0;
                     }
-
+                    // double dF = gii - gjj;
                     pddtt += -2.0 * mij[ii][jj] / double(phiNum[i][j]) * (sum1 - 8.0 / PI * dF * sqrt(phi[ii][i][j] * phi[jj][i][j]));
                     //フェーズフィールドの発展方程式[式(4.31)]
                 }
@@ -189,75 +235,8 @@ start:;
                     phi2[ii][i][j] = 0.0;
                 }
             }
-
         } // j
     }     // i
-
-    // After the evolution of phase field,
-    // Calculate concentration field for solid/liquid phases and add them to get local conentation value
-    for (i = 0; i <= ndm; i++)
-    {
-        for (j = 0; j <= ndm; j++)
-        {
-            c = ch[i][j]; //濃度場
-            sum1 = 0.0;
-            for (ii = 1; ii <= nm - 1; ii++)
-            {
-                sum1 += phi[ii][i][j];
-            }
-            sa = sah[i][j] = sum1; // Sαの計算[式(4.46)]
-            sum1 = 0.0;
-            for (ii = nm; ii <= nm; ii++)
-            {
-                sum1 += phi[ii][i][j];
-            }
-            sb = sbh[i][j] = sum1; // Sβの計算[式(4.46)]
-
-            // if (sah[i][j] == 1.0)
-            // {
-            //     cah[i][j] = ch[i][j];
-            //     cbh[i][j] = 0.4;
-            // }
-            // else if (sah[i][j] < 1.0 && sah[i][j] > 0.0)
-            // {
-            //     // partition within the interface follows thermodynamic rule and mass conservation
-            //     cah[i][j] = 0.1;
-            //     // cbh[i][j] = 0.4;
-            //     cbh[i][j] = (ch[i][j] - 0.1 * sah[i][j]) / sbh[i][j];
-            //     // if (cbh[i][j] > 0.4)
-            //     // {
-            //     //     cbh[i][j] = 0.2;
-            //     // }
-            // }
-            // else if (sah[i][j] == 0.0)
-            // {
-            //     cah[i][j] = 0.1;
-            //     cbh[i][j] = ch[i][j];
-            // }
-
-            // 局所平衡組成の計算[式(4.47)]
-            // cah[i][j] = 0.1;
-            // cbh[i][j] = 0.4;
-            cah[i][j] = (A_beta * c + (A_alph * c_alph0 - A_beta * c_beta0) * sb) / (A_beta * sa + A_alph * sb);
-            cbh[i][j] = (A_alph * c + (A_beta * c_beta0 - A_alph * c_alph0) * sa) / (A_beta * sa + A_alph * sb);
-            if (cah[i][j] >= 1.0)
-            {
-                cah[i][j] = 1.0;
-            }
-            if (cah[i][j] <= 0.0)
-            {
-                cah[i][j] = 0.0;
-            } //濃度場の変域補正
-            if (cbh[i][j] >= 1.0)
-            {
-                cbh[i][j] = 1.0;
-            }
-            if (cbh[i][j] <= 0.0)
-            {
-                cbh[i][j] = 0.0;
-            }
-        }
-    }
 
     // Evolution Equation of Concentration field
     for (i = 0; i <= ndm; i++)

@@ -13,7 +13,7 @@ using namespace std;
 
 #define DRND(x) ((double)(x) / RAND_MAX * rand()) //乱数の設定
 
-#define ND 100 //差分計算における計算領域一辺の分割数
+#define ND 200 //差分計算における計算領域一辺の分割数
 #define N 3    //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
 
 int nd = ND,
@@ -66,12 +66,13 @@ double vm0;    //モル体積
 
 double A_alph, A_beta, c_alph0, c_beta0; //化学的自由エネルギー内のパラメータ
 double c, sa, sb, Da, Db, D;             //濃度場、Sα、Sβ、拡散係数（Dα、Dβ）、重み付拡散係数D
-// double gii, gjj, cii, cjj;               //化学的自由エネルギー、局所平衡濃度
+double gii, gjj, cii, cjj;               //化学的自由エネルギー、局所平衡濃度
+double ptl;
+double dF;
 double dgdc;                           //化学的自由エネルギーの濃度微分
 double cddtt;                          //濃度の変化率
 double dc0;                            //濃度場補正用の作業変数
 double dev1_a, dev1_b, dev2_a, dev2_b; //拡散方程式内における微分計算の際の作業変数
-double dF;
 
 double c0;                       //平均組成
 double ch[ND][ND], ch2[ND][ND];  //濃度場、濃度場の補助配列
@@ -95,6 +96,13 @@ void initialize()
     srand(3.0); // 乱数初期化
                 // srand(time(NULL)); // 乱数初期化
 
+    x1h[1] = 0.25 * nd;
+    y1h[1] = 0.25 * nd; //初期核１の座標設定
+    // x1h[2] = 0.75 * nd;
+    // y1h[2] = 0.75 * nd; //初期核２の座標設定
+    // x1h[1] = 0.25 * nd;
+    // y1h[1] = 0.25 * nd; //初期核３の座標設定
+
     //*** 式(4.36) - 式(4.39)の配列（K,W,M,E）の設定 **************************
     for (i = 1; i <= nm; i++)
     {
@@ -109,7 +117,7 @@ void initialize()
             if ((i == nm) || (j == nm))
             {
                 fij[i][j] = F0;
-                anij[i][j] = false;
+                anij[i][j] = true;
                 thij[i][j] = PI / 2.0 * DRND(1);
             }
             if (i > j)
@@ -154,17 +162,23 @@ void initialize()
         }
     }
 
+    r0 = 15.0;
     for (ii = 1; ii <= nm - 1; ii++)
     {
+        x1 = x1h[ii];
+        y1 = y1h[ii];
+        // x1 = nd * DRND(1);
+        // y1 = nd * DRND(1); //初期核の位置
         for (i = 0; i <= ndm; i++)
         {
             for (j = 0; j <= ndm; j++)
             {
-                if (j < ND / 2)
+                r = sqrt((double(i - x1)) * (double(i - x1)) + (double(j - y1)) * (double(j - y1)));
+                if (r <= r0)
                 {
                     phi[ii][i][j] = 1.0;
                     phi[nm][i][j] = 0.0;
-                }
+                } //初期核位置のフェーズフィールドを設定
             }
         }
     }
