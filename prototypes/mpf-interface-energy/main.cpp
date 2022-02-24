@@ -4,10 +4,13 @@ int main(void)
 {
     // datain();
 
+    nstep = 201;
+    pstep = 10;
+
     dx = 30.0e-9;   // m
     dtime = 4.0e-7; // s
 
-    gamma0 = 0.1; // J/m2
+    gamma0 = 0.2; // J/m2
     delta = 7.0 * dx;
 
     temp = 1000;                  // K
@@ -18,19 +21,51 @@ int main(void)
     W0 = 4.0 * gamma0 / delta;
     M0 = mobi * PI * PI / (8.0 * delta);
 
-    cout << "The mobility is: " << mobi << endl;
+    cout << "The phase field mobility is: " << mobi << endl;
+    cout << "The Gradient coefficient is: " << A0 << endl;
+    cout << "The penalty coefficient is: " << W0 << endl;
     cout << "The stablity number is: " << dtime * M0 * A0 / (dx * dx) << endl;
-
-    nstep = 1001;
-    pstep = 200;
 
     initialize();
 
 start:;
 
+    // calculate the excessive enenrgy at the interface region
+    Eexc = 0.0;
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            ip = i + 1;
+            im = i - 1;
+            jp = j + 1;
+            jm = j - 1;
+            if (i == ndm)
+            {
+                ip = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+            } //周期的境界条件
+            if (j == ndm)
+            {
+                jp = 0;
+            }
+            if (j == 0)
+            {
+                jm = ndm;
+            }
+            phidx = (phi[1][ip][j] - phi[1][im][j]) / (2.0 * dx);
+            phidy = (phi[1][i][jp] - phi[1][i][jm]) / (2.0 * dx);
+            Eexc += 0.5 * A0 * (phidx * phidx + phidy * phidy) + W0 * phi[1][i][j] * (1.0 - phi[1][i][j]);
+        }
+    }
+
     if ((((int)(istep) % pstep) == 0))
     {
-        datasave(istep);
+        // datasave(istep);
+        cout << "the excessive energy density (J/m2) is: " << 2.0 * Eexc * 7.0 * dx << endl;
     }
 
     //**** 各差分プロックにおけるphiNum[i][j]とphiIdx[n00][i][j]を調査 *********************
@@ -71,7 +106,6 @@ start:;
                 {
                     phinum++;
                     phiIdx[phinum][i][j] = ii;
-                    // printf("%d  ", n00);
                 }
             }
             phiNum[i][j] = phinum;

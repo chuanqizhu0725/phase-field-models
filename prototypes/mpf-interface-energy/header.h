@@ -32,11 +32,9 @@ double astre;
 
 double phi[N][ND][ND], phi2[N][ND][ND]; //フェーズフィールド、フェーズフィールド補助配列
 double aij[N][N];                       //勾配エネルギー係数
-double anij[N][N];
-double thij[N][N];
-double wij[N][N];      //ペナルティー項の係数
-double mij[N][N];      //粒界の易動度
-double fij[N][N];      //粒界移動の駆動力
+double wij[N][N];                       //ペナルティー項の係数
+double mij[N][N];                       //粒界の易動度
+
 int phiIdx[N][ND][ND]; //位置(i,j)およびその周囲(i±1,j±1)において、pが０ではない方位の番号
 int phiNum[ND][ND];
 int phinum;
@@ -62,6 +60,8 @@ double gamma0; //粒界エネルギ密度
 double delta;  //粒界幅（差分ブロック数にて表現）
 double mobi;   //粒界の易動度
 double vm0;    //モル体積
+
+double Eexc;
 
 void initialize();
 void datasave(int step);
@@ -175,12 +175,12 @@ void datasave(int step)
     {
         for (int j = 0; j <= ndm; j++)
         {
-            double sumPic = 0.0;
+            double iphi = 0.0;
             for (int k = 0; k <= nm; k++)
             {
-                sumPic += phi[k][i][j] * phi[k][i][j];
+                iphi += phi[k][i][j] * phi[k][i][j];
             }
-            fprintf(stream, "%e   ", sumPic); //フェーズフィールドの保存
+            fprintf(stream, "%e   ", iphi); //フェーズフィールドの保存
             fprintf(stream, "\n");
         }
     }
