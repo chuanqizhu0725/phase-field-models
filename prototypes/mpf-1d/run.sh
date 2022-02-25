@@ -1,0 +1,1 @@
+g++ main.cpp -o main && rm data/phi/*.csv figures/phi/*.png && ./main && python plot.py
