@@ -11,7 +11,7 @@
 using namespace std;
 
 #define N 2
-#define ND 10000
+#define ND 400
 #define PI 3.14159
 
 int nm = N - 1;
@@ -33,6 +33,15 @@ double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double F0 = 1.0e5;
 
+double As = 1.0e+02;
+double cs0 = 0.1;
+double Al = 1.0e+02;
+double cl0 = 0.4;
+double Ds = 0.1e-6;
+double Dl = 0.5e-5;
+
+double con[ND], con2[ND], cons[ND], conl[ND];
+
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][ND], phi2[N][ND];
@@ -51,13 +60,16 @@ double termiikk, termjjkk;
 
 double dF;
 
+double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+
 void datasave(int step);
 
 int main(void)
 {
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
-    cout << "laplacian stability number is: " << dtime / dx / dx * mobi * gamma0 << endl;
+    cout << "concenration field stablity number is: " << dtime * Dl / dx / dx << endl;
+    cout << "phase field stability number is: " << dtime / dx / dx * mobi * gamma0 << endl;
     cout << "unpper limit of driving force is: " << delta / dtime / mobi / PI << endl;
     cout << "The dimension is" << endl;
     cout << "***************   " << ND * dx << " m"
@@ -81,19 +93,27 @@ int main(void)
         }
     }
 
+    sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
         if (i <= ND / 8)
         {
             phi[0][i] = 1.0;
+            cons[i] = 0.1;
             phi[1][i] = 0.0;
+            conl[i] = 0.4;
         }
         else
         {
-            phi[1][i] = 1.0;
             phi[0][i] = 0.0;
+            cons[i] = 0.1;
+            phi[1][i] = 1.0;
+            conl[i] = 0.4;
         }
+        con[i] = phi[0][i] * cons[i] + phi[1][i] * conl[i];
+        sum1 += con[i];
     }
+    c0 = sum1 / ND;
 
 start:;
 
@@ -174,13 +194,12 @@ start:;
                     dF = 0.0;
                 }
                 pddtt += -2.0 * mij[ii][jj] / double(phiNum[i]) * (sum1 - 8.0 / PI * dF * sqrt(phi[ii][i] * phi[jj][i]));
-                //フェーズフィールドの発展方程式[式(4.31)]
             }
-            phi2[ii][i] = phi[ii][i] + pddtt * dtime; //フェーズフィールドの時間発展（陽解法）
+            phi2[ii][i] = phi[ii][i] + pddtt * dtime;
             if (phi2[ii][i] >= 1.0)
             {
                 phi2[ii][i] = 1.0;
-            } //フェーズフィールドの変域補正
+            }
             if (phi2[ii][i] <= 0.0)
             {
                 phi2[ii][i] = 0.0;
@@ -207,6 +226,82 @@ start:;
         for (k = 0; k <= nm; k++)
         {
             phi[k][i] = phi[k][i] / sum1;
+        }
+    }
+
+    // Calculate the concentration field in solid and liqud phase
+    for (i = 0; i < ndm; i++)
+    {
+        cons[i] = (Al * con[i] + (As * cs0 - Al * cl0) * phi[1][i]) / (Al * phi[0][i] + As * phi[1][i]);
+        conl[i] = (As * con[i] + (Al * cl0 - As * cs0) * phi[0][i]) / (Al * phi[0][i] + As * phi[1][i]);
+        if (cons[i] >= 1.0)
+        {
+            cons[i] = 1.0;
+        }
+        if (cons[i] <= 0.0)
+        {
+            cons[i] = 0.0;
+        }
+        if (conl[i] >= 1.0)
+        {
+            conl[i] = 1.0;
+        }
+        if (conl[i] <= 0.0)
+        {
+            conl[i] = 0.0;
+        }
+    }
+
+    // Evolution Equation of Concentration field
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            ip = i + 1;
+            im = i - 1;
+            if (i == ndm)
+            {
+                ip = ndm - 1;
+            }
+            if (i == 0)
+            {
+                im = 1;
+            }
+
+            //拡散方程式内における微分計算
+            dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im]));
+            dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im]));
+            dev2_s = phi[0][ip] * (cons[ip] + cons[im] - 2.0 * cons[i]);
+            dev2_l = phi[1][ip] * (conl[ip] + conl[im] - 2.0 * conl[i]);
+
+            cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
+            con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
+            // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+        }
+    }
+
+    for (i = 0; i <= ndm; i++)
+    {
+        con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
+    }
+
+    //*** 濃度場の収支補正 *************************************************************
+    sum1 = 0.0;
+    for (i = 0; i <= ndm; i++)
+    {
+        sum1 += con[i];
+    }
+    dc0 = sum1 / ND - c0;
+    for (i = 0; i <= ndm; i++)
+    {
+        con[i] = con[i] - dc0;
+        if (con[i] > 1.0)
+        {
+            con[i] = 1.0;
+        }
+        if (con[i] < 0.0)
+        {
+            con[i] = 0.0;
         }
     }
 
