@@ -11,14 +11,14 @@
 using namespace std;
 
 #define N 2
-#define ND 800
+#define ND 400
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 500001;
-int pstep = 20000;
+int nstep = 1000001;
+int pstep = 50000;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -37,13 +37,13 @@ double Ds = 0.1e-6;
 double Dl = 0.5e-5;
 double temp = 1000.0; // K
 double Te = 800.0;
-double ml = 2000.0;
+double ml1 = 2000.0;
 double ce = 0.4;
 double kap = 0.25;
-// double cl0 = ce - (temp - Te) / ml;
-// double cs0 = cl0 * kap;
-double cs0 = 0.1;
-double cl0 = 0.4;
+double cl0 = ce - (temp - Te) / ml1;
+double cs0 = cl0 * kap;
+// double cs0 = 0.1;
+// double cl0 = 0.4;
 
 double con[ND], con2[ND], cons[ND], conl[ND];
 
@@ -172,8 +172,8 @@ start:;
         phiNum[i] = phinum;
     }
 
-    // Calculate the concentration field in solid and liqud phase
-    for (i = 0; i < ndm; i++)
+    // Calculate the concentration field in solid and liqud phase based on local concentration and equilibrium rule.
+    for (i = 0; i <= ndm; i++)
     {
         cons[i] = cs0;
         if (phi[1][i] == 0)
@@ -207,49 +207,23 @@ start:;
     {
         ip = i + 1;
         im = i - 1;
-        // if (i == ndm)
-        // {
-        //     ip = ndm - 1;
-        // }
-        // if (i == 0)
-        // {
-        //     im = 1;
-        // }
-        //拡散方程式内における微分計算
         dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im])) / dx / dx;
         dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im])) / dx / dx;
         dev2_s = phi[0][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
         dev2_l = phi[1][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
 
-        cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-        con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
-                                                                 // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+        cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
+        con2[i] = con[i] + cddtt * dtime;
+        // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
     }
 
-    for (i = 1; i <= ndm - 1; i++)
+    // Set the boundary value to a value of inner grid (isolated box)
+    con2[ndm] = con2[ndm - 1];
+    con2[0] = con2[1];
+    for (i = 0; i <= ndm; i++)
     {
-        con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
+        con[i] = con2[i];
     }
-
-    //*** 濃度場の収支補正 *************************************************************
-    sum1 = 0.0;
-    for (i = 1; i <= ndm - 1; i++)
-    {
-        sum1 += con[i];
-    }
-    // dc0 = sum1 / ND - c0;
-    // for (i = 1; i <= ndm - 1; i++)
-    // {
-    //     con[i] = con[i] - dc0;
-    //     if (con[i] > 1.0)
-    //     {
-    //         con[i] = 1.0;
-    //     }
-    //     if (con[i] < 0.0)
-    //     {
-    //         con[i] = 0.0;
-    //     }
-    // }
 
     // Evolution Equation of Phase Fields
     for (i = 0; i <= ndm; i++)
@@ -343,22 +317,17 @@ end:;
 
 void datasave(int step)
 {
-    FILE *stream; //ストリームのポインタ設定
+    FILE *stream;
     char buffer[30];
     sprintf(buffer, "data/phi/1d%d.csv", step);
-    stream = fopen(buffer, "a"); //書き込む先のファイルを追記方式でオープン
+    stream = fopen(buffer, "a");
 
     for (int i = 0; i <= ndm; i++)
     {
-        // double iphi = 0.0;
-        // for (int k = 0; k <= nm; k++)
-        // {
-        //     iphi += phi[k][i] * phi[k][i];
-        // }
         fprintf(stream, "%e   ", phi[0][i]);
         fprintf(stream, "\n");
     }
-    fclose(stream); //ファイルをクローズ
+    fclose(stream);
 
     FILE *streamc;
     char bufferc[30];
@@ -367,7 +336,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamc, "%e   ", con[i]);
+        fprintf(streamc, "%e   ", cons[i] * phi[0][i] + conl[i] * phi[1][i]);
         fprintf(streamc, "\n");
     }
     fclose(streamc);
