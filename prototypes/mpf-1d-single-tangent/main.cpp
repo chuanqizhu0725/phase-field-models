@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 100001;
-int pstep = 10000;
+int nstep = 500001;
+int pstep = 20000;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -33,12 +33,17 @@ double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double F0 = 5.0e4;
 
-double As = 1.0e+02;
-double cs0 = 0.1;
-double Al = 1.0e+01;
-double cl0 = 0.4;
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
+double temp = 1000.0; // K
+double Te = 800.0;
+double ml = 2000.0;
+double ce = 0.4;
+double kap = 0.25;
+// double cl0 = ce - (temp - Te) / ml;
+// double cs0 = cl0 * kap;
+double cs0 = 0.1;
+double cl0 = 0.4;
 
 double con[ND], con2[ND], cons[ND], conl[ND];
 
@@ -104,13 +109,13 @@ int main(void)
             phi[1][i] = 0.0;
             conl[i] = cl0;
         }
-        else if ((i > ND / 8) && (i < (ND / 8 + 6)))
+        else if ((i > ND / 8) && (i <= (ND / 8 + delta / dx)))
         {
-            dd = 1.0 - (i - ND / 8) * 0.2;
+            dd = 1.0 - (i - ND / 8) * (1.0 / (delta / dx));
             phi[0][i] = dd * dd * dd * (10.0 - 15.0 * dd + 6.0 * dd * dd);
             cons[i] = cs0;
             phi[1][i] = 1.0 - phi[0][i];
-            conl[i] = 0.2 + 0.2 * dd * dd * dd * (10.0 - 15.0 * dd + 6.0 * dd * dd);
+            conl[i] = 0.2 + (cl0 - 0.2) * dd * dd * dd * (10.0 - 15.0 * dd + 6.0 * dd * dd);
         }
         else
         {
@@ -124,6 +129,7 @@ int main(void)
         sum1 += con[i];
     }
     c0 = sum1 / ND;
+    cout << "nominal concentration is: " << c0 << endl;
 
 start:;
 
@@ -131,6 +137,13 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
+
+        sum1 = 0.0;
+        for (i = 0; i <= ndm; i++)
+        {
+            sum1 += con[i];
+        }
+        cout << "nominal concentration is: " << sum1 / ND << endl;
     }
 
     for (i = 0; i <= ndm; i++)
@@ -171,8 +184,6 @@ start:;
         {
             conl[i] = (con[i] - phi[0][i] * cons[i]) / phi[1][i];
         }
-        // cons[i] = (Al * con[i] + (As * cs0 - Al * cl0) * phi[1][i]) / (Al * phi[0][i] + As * phi[1][i]);
-        // conl[i] = (As * con[i] + (Al * cl0 - As * cs0) * phi[0][i]) / (Al * phi[0][i] + As * phi[1][i]);
         if (cons[i] >= 1.0)
         {
             cons[i] = 1.0;
@@ -187,7 +198,7 @@ start:;
         }
         if (conl[i] <= 0.0)
         {
-            conl[i] = cl0;
+            conl[i] = 0.0;
         }
     }
 
@@ -196,6 +207,14 @@ start:;
     {
         ip = i + 1;
         im = i - 1;
+        // if (i == ndm)
+        // {
+        //     ip = ndm - 1;
+        // }
+        // if (i == 0)
+        // {
+        //     im = 1;
+        // }
         //拡散方程式内における微分計算
         dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im])) / dx / dx;
         dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im])) / dx / dx;
@@ -207,30 +226,30 @@ start:;
                                                                  // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
     }
 
-    for (i = 0; i <= ndm; i++)
+    for (i = 1; i <= ndm - 1; i++)
     {
         con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
     }
 
     //*** 濃度場の収支補正 *************************************************************
     sum1 = 0.0;
-    for (i = 0; i <= ndm; i++)
+    for (i = 1; i <= ndm - 1; i++)
     {
         sum1 += con[i];
     }
-    dc0 = sum1 / ND - c0;
-    for (i = 0; i <= ndm; i++)
-    {
-        con[i] = con[i] - dc0;
-        if (con[i] > 1.0)
-        {
-            con[i] = 1.0;
-        }
-        if (con[i] < 0.0)
-        {
-            con[i] = 0.0;
-        }
-    }
+    // dc0 = sum1 / ND - c0;
+    // for (i = 1; i <= ndm - 1; i++)
+    // {
+    //     con[i] = con[i] - dc0;
+    //     if (con[i] > 1.0)
+    //     {
+    //         con[i] = 1.0;
+    //     }
+    //     if (con[i] < 0.0)
+    //     {
+    //         con[i] = 0.0;
+    //     }
+    // }
 
     // Evolution Equation of Phase Fields
     for (i = 0; i <= ndm; i++)
