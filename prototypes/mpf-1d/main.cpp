@@ -11,31 +11,31 @@
 using namespace std;
 
 #define N 2
-#define ND 400
+#define ND 800
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 101;
-int pstep = 10;
+int nstep = 400001;
+int pstep = 10000;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
 
 double gamma0 = 0.1;
-double delta = 5.0 * dx;
+double delta = 6.0 * dx;
 
 double mobi = 4.20951e-05;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 1.0e5;
+double F0 = 5.0e4;
 
 double As = 1.0e+02;
 double cs0 = 0.1;
-double Al = 1.0e+02;
+double Al = 1.0e+01;
 double cl0 = 0.4;
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
@@ -101,16 +101,17 @@ int main(void)
             phi[0][i] = 1.0;
             cons[i] = 0.1;
             phi[1][i] = 0.0;
-            conl[i] = 0.4;
+            conl[i] = 0.0;
         }
         else
         {
             phi[0][i] = 0.0;
-            cons[i] = 0.1;
+            cons[i] = 0.0;
             phi[1][i] = 1.0;
-            conl[i] = 0.4;
+            conl[i] = 0.2;
         }
         con[i] = phi[0][i] * cons[i] + phi[1][i] * conl[i];
+        con2[i] = con[i];
         sum1 += con[i];
     }
     c0 = sum1 / ND;
@@ -183,11 +184,11 @@ start:;
                 }
                 if (ii != nm && jj == nm)
                 {
-                    dF = F0;
+                    dF = F0 * (0.4 - conl[i]) * 40;
                 }
                 else if (ii == nm && jj != nm)
                 {
-                    dF = -F0;
+                    dF = -F0 * (0.4 - conl[i]) * 40;
                 }
                 else
                 {
@@ -253,31 +254,19 @@ start:;
     }
 
     // Evolution Equation of Concentration field
-    for (i = 0; i <= ndm; i++)
+    for (i = 1; i <= ndm - 1; i++)
     {
-        for (j = 0; j <= ndm; j++)
-        {
-            ip = i + 1;
-            im = i - 1;
-            if (i == ndm)
-            {
-                ip = ndm - 1;
-            }
-            if (i == 0)
-            {
-                im = 1;
-            }
+        ip = i + 1;
+        im = i - 1;
+        //拡散方程式内における微分計算
+        dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im])) / dx / dx;
+        dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im])) / dx / dx;
+        dev2_s = phi[0][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
+        dev2_l = phi[1][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
 
-            //拡散方程式内における微分計算
-            dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im]));
-            dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im]));
-            dev2_s = phi[0][ip] * (cons[ip] + cons[im] - 2.0 * cons[i]);
-            dev2_l = phi[1][ip] * (conl[ip] + conl[im] - 2.0 * conl[i]);
-
-            cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-            con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
-            // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
-        }
+        cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
+        con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
+                                                                 // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
     }
 
     for (i = 0; i <= ndm; i++)
@@ -333,4 +322,40 @@ void datasave(int step)
         fprintf(stream, "\n");
     }
     fclose(stream); //ファイルをクローズ
+
+    FILE *streamc;
+    char bufferc[30];
+    sprintf(bufferc, "data/con/1d%d.csv", step);
+    streamc = fopen(bufferc, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamc, "%e   ", con[i]);
+        fprintf(streamc, "\n");
+    }
+    fclose(streamc);
+
+    FILE *streamcs;
+    char buffercs[30];
+    sprintf(buffercs, "data/cons/1d%d.csv", step);
+    streamcs = fopen(buffercs, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "\n");
+    }
+    fclose(streamcs);
+
+    FILE *streamcl;
+    char buffercl[30];
+    sprintf(buffercl, "data/conl/1d%d.csv", step);
+    streamcl = fopen(buffercl, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcl, "%e   ", conl[i]);
+        fprintf(streamcl, "\n");
+    }
+    fclose(streamcl);
 }

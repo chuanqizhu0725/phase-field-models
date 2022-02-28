@@ -4,15 +4,18 @@
 #include <math.h>
 #include <iostream>
 
+using namespace std;
+
 #define DRND(x) ((double)(x) / RAND_MAX * rand()) //乱数の関数設定
 
 #define NDP 100
 
-int nd = NDP - 1, ndm = NDP - 2, nd2 = (NDP - 1) / 2; //計算領域の一辺の差分ブロック数、nd-1を定義、nd/2を定義
-double delt;                                          //時間刻み
-double PI = 3.14159, RR = 8.3145;                     //円周率、ガス定数
-double Tini, Tm, time1;                               //初期温度、融点、計算カウント数
-double s1h[NDP][NDP], Th[NDP][NDP];                   //フェーズフィールド、温度場
+int nd = NDP - 1,
+    ndm = NDP - 2, nd2 = (NDP - 1) / 2; //計算領域の一辺の差分ブロック数、nd-1を定義、nd/2を定義
+double delt;                            //時間刻み
+double PI = 3.14159, RR = 8.3145;       //円周率、ガス定数
+double Tini, Tm, time1;                 //初期温度、融点、計算カウント数
+double s1h[NDP][NDP], Th[NDP][NDP];     //フェーズフィールド、温度場
 
 void ini000(); //初期場の設定サブル－チン
 
@@ -109,14 +112,15 @@ int main(void)
     {
         delt = dtp;
     }
-    printf("delt= %e \n", delt);
+    printf("dtp= %e \n", dtp);
+    printf("dtt= %e \n", dtt);
     //-----------------------------------------------------------------
 
     anois = 0.0; //ノイズの振幅
 
     time1 = 0.0;
     time1max = 1.0 + 1.0e+08; //計算時間の初期値と最大値
-
+    // time1max = 1.0 + 1000.0;
     //*** 初期濃度場の設定と描画Window表示 *****************************************
 
     ini000(); //初期場の設定
@@ -125,7 +129,7 @@ int main(void)
 start:;
 
     // if((((int)(time1) % 500)==0)){datsave();}		//一定繰返しカウント毎に場を保存
-    if ((((int)(time1) % 2000) == 0))
+    if ((((int)(time1) % 1000) == 0))
     {
         std::cout << "hello, I started one step!" << time1 << "\n";
 
@@ -143,6 +147,21 @@ start:;
             }
         }
         fclose(stream); //ファイルをクローズ
+
+        FILE *stream1; //ストリームのポインタ設定
+        char buffer1[30];
+        sprintf(buffer1, "data/temp/2d%d.csv", (int)(time1));
+        stream1 = fopen(buffer1, "a"); //書き込む先のファイルを追記方式でオープン
+
+        for (int i = 0; i <= nd; i++)
+        {
+            for (int j = 0; j <= nd; j++)
+            {
+                fprintf(stream1, "%e   ", Th[i][j]); //フェーズフィールドの保存
+                fprintf(stream1, "\n");
+            }
+        }
+        fclose(stream1); //ファイルをクローズ
     }
 
     //****** フェーズフィールドおよび温度場の時間発展  **************

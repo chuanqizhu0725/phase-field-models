@@ -4,8 +4,8 @@ int main(void)
 {
     // datain();
 
-    nstep = 201;
-    pstep = 10;
+    nstep = 10001;
+    pstep = 1000;
 
     dx = 30.0e-9;   // m
     dtime = 4.0e-7; // s
@@ -21,51 +21,15 @@ int main(void)
     W0 = 4.0 * gamma0 / delta;
     M0 = mobi * PI * PI / (8.0 * delta);
 
-    cout << "The phase field mobility is: " << mobi << endl;
-    cout << "The Gradient coefficient is: " << A0 << endl;
-    cout << "The penalty coefficient is: " << W0 << endl;
     cout << "The stablity number is: " << dtime * M0 * A0 / (dx * dx) << endl;
 
     initialize();
 
 start:;
 
-    // calculate the excessive enenrgy at the interface region
-    Eexc = 0.0;
-    for (i = 0; i <= ndm; i++)
-    {
-        for (j = 0; j <= ndm; j++)
-        {
-            ip = i + 1;
-            im = i - 1;
-            jp = j + 1;
-            jm = j - 1;
-            if (i == ndm)
-            {
-                ip = 0;
-            }
-            if (i == 0)
-            {
-                im = ndm;
-            } //周期的境界条件
-            if (j == ndm)
-            {
-                jp = 0;
-            }
-            if (j == 0)
-            {
-                jm = ndm;
-            }
-            phidx = (phi[1][ip][j] - phi[1][im][j]) / (2.0 * dx);
-            phidy = (phi[1][i][jp] - phi[1][i][jm]) / (2.0 * dx);
-            Eexc += 0.5 * A0 * (phidx * phidx + phidy * phidy) + W0 * phi[1][i][j] * (1.0 - phi[1][i][j]);
-        }
-    }
-
     if ((((int)(istep) % pstep) == 0))
     {
-        // datasave(istep);
-        cout << "the excessive energy density (J/m2) is: " << 2.0 * Eexc * delta << endl;
+        datasave(istep);
     }
 
     //**** 各差分プロックにおけるphiNum[i][j]とphiIdx[n00][i][j]を調査 *********************
@@ -156,7 +120,19 @@ start:;
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j];
                     }
-                    pddtt += -2.0 * mij[ii][jj] / double(phiNum[i][j]) * sum1;
+                    if (ii != nm && jj == nm)
+                    {
+                        dF = 100.0 * RR * temp;
+                    }
+                    else if (ii == nm && jj != nm)
+                    {
+                        dF = -100.0 * RR * temp;
+                    }
+                    else
+                    {
+                        dF = 0.0;
+                    }
+                    pddtt += -2.0 * mij[ii][jj] / double(phiNum[i][j]) * (sum1 - 8.0 / PI * dF * sqrt(phi[ii][i][j] * phi[jj][i][j]));
                     //フェーズフィールドの発展方程式[式(4.31)]
                 }
                 phi2[ii][i][j] = phi[ii][i][j] + pddtt * dtime; //フェーズフィールドの時間発展（陽解法）

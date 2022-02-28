@@ -12,7 +12,7 @@ using namespace std;
 
 #define DRND(x) ((double)(x) / RAND_MAX * rand()) //乱数の設定
 
-#define ND 400 //差分計算における計算領域一辺の分割数
+#define ND 250 //差分計算における計算領域一辺の分割数
 #define N 3    //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
 
 int nd = ND,
@@ -33,10 +33,16 @@ double astre;
 double Tm, Tini;
 double cndct, speht, laht;
 
+double tddtt;
+
+double temp[ND][ND], temp2[ND][ND];
+
 double phi[N][ND][ND], phi2[N][ND][ND]; //フェーズフィールド、フェーズフィールド補助配列
 double aij[N][N];                       //勾配エネルギー係数
 double wij[N][N];                       //ペナルティー項の係数
 double mij[N][N];                       //粒界の易動度
+double anij[N][N];
+double thij[N][N];
 
 int phiIdx[N][ND][ND]; //位置(i,j)およびその周囲(i±1,j±1)において、pが０ではない方位の番号
 int phiNum[ND][ND];
@@ -55,7 +61,6 @@ double M0;               //粒界の易動度
 double W0;               //ペナルティー項の係数
 double A0;               //勾配エネルギー係数
 double F0;               //粒界移動の駆動力
-double temp;             //温度
 double sum1, sum2, sum3; //各種の和の作業変数
 double pddtt;            //フェーズフィールドの時間変化率
 
@@ -66,6 +71,8 @@ double vm0;    //モル体積
 
 double Eexc;
 double dF;
+
+double skipphi;
 
 void initialize();
 void datasave(int step);
@@ -84,8 +91,8 @@ void initialize()
     srand(3.0); // 乱数初期化
                 // srand(time(NULL)); // 乱数初期化
 
-    // x1h[1] = 0.25 * nd;
-    // y1h[1] = 0.25 * nd; //初期核１の座標設定
+    x1h[1] = 0 * nd;
+    y1h[1] = 0 * nd; //初期核１の座標設定
 
     //*** 式(4.36) - 式(4.39)の配列（K,W,M,E）の設定 **************************
     for (i = 1; i <= nm; i++)
@@ -95,11 +102,24 @@ void initialize()
             wij[i][j] = W0;
             aij[i][j] = A0;
             mij[i][j] = M0;
+            anij[i][j] = false;
+            thij[i][j] = 0.0;
+            if ((i == nm) || (j == nm))
+            {
+                anij[i][j] = true;
+                thij[i][j] = PI / 2.0 * DRND(1);
+            }
+            if (i > j)
+            {
+                thij[i][j] = thij[j][i];
+            }
             if (i == j)
             {
                 wij[i][j] = 0.0;
                 aij[i][j] = 0.0;
                 mij[i][j] = 0.0;
+                anij[i][j] = false;
+                thij[i][j] = 0.0;
             }
         }
     }
@@ -129,23 +149,31 @@ void initialize()
         }
     }
 
-    // r0 = 15.0;
+    r0 = 2.0;
     for (ii = 1; ii <= nm - 1; ii++)
     {
-        // x1 = x1h[ii];
-        // y1 = y1h[ii];
+        x1 = x1h[ii];
+        y1 = y1h[ii];
         for (i = 0; i <= ndm; i++)
         {
             for (j = 0; j <= ndm; j++)
             {
-                // r = sqrt((double(i - x1)) * (double(i - x1)) + (double(j - y1)) * (double(j - y1)));
-                // if (r <= r0)
-                if (j < ND / 2)
+                r = sqrt((double(i - x1)) * (double(i - x1)) + (double(j - y1)) * (double(j - y1)));
+                if (r <= r0)
+                // if (j < ND / 2)
                 {
                     phi[ii][i][j] = 1.0;
                     phi[nm][i][j] = 0.0;
                 } //初期核位置のフェーズフィールドを設定
             }
+        }
+    }
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            temp[i][j] = Tini + (Tm - Tini) * (1.0 - phi[nm][i][j]);
+            temp2[i][j] = 0.0;
         }
     }
 
@@ -189,4 +217,39 @@ void datasave(int step)
         }
     }
     fclose(stream); //ファイルをクローズ
+
+    FILE *stream1; //ストリームのポインタ設定
+    char buffer1[30];
+    sprintf(buffer1, "data/temp/2d%d.csv", step);
+    stream1 = fopen(buffer1, "a"); //書き込む先のファイルを追記方式でオープン
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        for (int j = 0; j <= ndm; j++)
+        {
+            fprintf(stream1, "%e   ", temp[i][j]); //フェーズフィールドの保存
+            fprintf(stream1, "\n");
+        }
+    }
+    fclose(stream1); //ファイルをクローズ
+}
+
+double calcTheta(double dy, double dx)
+{
+    if (dx != 0.0)
+    {
+        return atan(dy / dx);
+    }
+    else if (dx == 0.0 && dy > 0)
+    {
+        return PI / 2.0;
+    }
+    else if (dx == 0.0 && dy < 0)
+    {
+        return PI / (-2.0);
+    }
+    else
+    {
+        return 0;
+    }
 }
