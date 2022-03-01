@@ -224,7 +224,7 @@ start:;
         im = i - 1;
         dev1_s = 0.25 * ((phi[1][ip] + phi[2][ip] - phi[1][im] - phi[2][im]) * (con1[ip] + con2[ip] - con1[im] - con2[im])) / dx / dx;
         dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (con0[ip] - con0[im])) / dx / dx;
-        dev2_s = (phi[1][i] + phi[1][i]) * (con1[ip] + con2[ip] + con1[im] + con2[im] - 2.0 * con1[i] - 2.0 * con2[i]) / dx / dx;
+        dev2_s = (phi[1][i] + phi[2][i]) * (con1[ip] + con2[ip] + con1[im] + con2[im] - 2.0 * con1[i] - 2.0 * con2[i]) / dx / dx;
         dev2_l = phi[0][i] * (con0[ip] + con0[im] - 2.0 * con0[i]) / dx / dx;
 
         cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);

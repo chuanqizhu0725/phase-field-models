@@ -37,13 +37,15 @@ double Ds = 0.1e-6;
 double Dl = 0.5e-5;
 double temp = 1000.0; // K
 double Te = 800.0;
-double ml1 = 2000.0;
+double ml = -2000.0;
+// double ml2 = 2000.0;
 double ce = 0.4;
 double kap = 0.25;
-double cl0 = ce - (temp - Te) / ml1;
+// double kap2 = 1.25;
+double cl0 = ce + (temp - Te) / ml;
+// double cl20 = ce + (temp - Te) / ml2;
 double cs0 = cl0 * kap;
-// double cs0 = 0.1;
-// double cl0 = 0.4;
+// double cs20 = cl20 * kap2;
 
 double con[ND], con2[ND], cons[ND], conl[ND];
 
@@ -105,14 +107,14 @@ int main(void)
         if (i <= ND / 8)
         {
             phi[0][i] = 1.0;
-            cons[i] = cs0;
+            cons[i] = cs10;
             phi[1][i] = 0.0;
-            conl[i] = cl0;
+            conl[i] = cl10;
         }
         else
         {
             phi[0][i] = 0.0;
-            cons[i] = cs0;
+            cons[i] = cs10;
             phi[1][i] = 1.0;
             conl[i] = 0.2;
         }
