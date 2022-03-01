@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 100001;
-int pstep = 10000;
+int nstep = 10001;
+int pstep = 1000;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -109,7 +109,7 @@ int main(void)
     {
         for (j = 0; j <= ndm; j++)
         {
-            if (i <= ND / 8)
+            if (i <= ND / 8 && j < ND / 2)
             {
                 phi[1][i][j] = 1.0;
                 con1[i][j] = c10;
@@ -118,7 +118,7 @@ int main(void)
                 phi[0][i][j] = 0.0;
                 con0[i][j] = c010;
             }
-            else if (i >= ND * 7 / 8)
+            else if (i <= ND / 8 && j >= ND / 2)
             {
                 phi[2][i][j] = 1.0;
                 con2[i][j] = c20;
@@ -162,11 +162,11 @@ start:;
             jm = j - 1;
             if (i == ndm)
             {
-                ip = ndm - 1;
+                ip = 0;
             }
             if (i == 0)
             {
-                im = 1;
+                im = ndm;
             }
             if (j == ndm)
             {
@@ -199,7 +199,6 @@ start:;
     {
         for (j = 0; j <= ndm; j++)
         {
-            // pure solid and solid in mixer
             con1[i][j] = c10;
             con2[i][j] = c20;
             // liquid in pure phase 1 or phase 2 or their mixer
@@ -207,25 +206,7 @@ start:;
             {
                 con0[i][j] = c010 * phi[1][i][j] + c020 * phi[2][i][j];
             }
-            // liquid in a mixer with phase 1
-            // else if (phi[0][i][j] > 0.0 && phi[2][i][j] == 0.0)
-            // {
-            //     con0[i][j] = (con[i][j] - phi[1][i][j] * con1[i][j]) / phi[0][i][j];
-            //     if (con0[i][j] >= c010)
-            //     {
-            //         con0[i][j] = c010;
-            //     }
-            // }
-            // // liquid in a mixer with phase 2
-            // else if (phi[0][i][j] > 0.0 && phi[1][i][j] == 0.0)
-            // {
-            //     con0[i][j] = (con[i][j] - phi[2][i][j] * con2[i][j]) / phi[0][i][j];
-            //     if (con0[i][j] <= c020)
-            //     {
-            //         con0[i][j] = c020;
-            //     }
-            // }
-            // liquid in a mixer with phase 2 or phase 1 or their mixer
+            // liquid in phase 2 or phase 1 or their mixer
             else if (phi[0][i][j] > 0.0 || (phi[1][i][j] >= 0.0 || phi[2][i][j] >= 0.0))
             {
                 con0[i][j] = (con[i][j] - phi[2][i][j] * con2[i][j] - phi[1][i][j] * con1[i][j]) / phi[0][i][j];
@@ -244,7 +225,7 @@ start:;
     }
 
     // Evolution Equation of Concentration field
-    for (i = 1; i <= ndm - 1; i++)
+    for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
         {
@@ -252,6 +233,14 @@ start:;
             im = i - 1;
             jp = j + 1;
             jm = j - 1;
+            if (i == ndm)
+            {
+                ip = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+            }
             if (j == ndm)
             {
                 jp = 0;
@@ -260,6 +249,7 @@ start:;
             {
                 jm = ndm;
             }
+
             dev1_s = 0.25 * ((phi[1][ip][j] + phi[2][ip][j] - phi[1][im][j] - phi[2][im][j]) * (con1[ip][j] + con2[ip][j] - con1[im][j] - con2[im][j]) + (phi[1][i][jp] + phi[2][i][jp] - phi[1][i][jm] - phi[2][i][jm]) * (con1[i][jp] + con2[i][jp] - con1[i][jm] - con2[i][jm])) / dx / dx;
             dev1_l = 0.25 * ((phi[0][ip][j] - phi[0][im][j]) * (con0[ip][j] - con0[im][j]) + (phi[0][i][jp] - phi[0][i][jm]) * (con0[i][jp] - con0[i][jm])) / dx / dx;
             dev2_s = (phi[1][i][j] + phi[2][i][j]) * (con1[ip][j] + con2[ip][j] + con1[im][j] + con2[im][j] + con1[i][jp] + con2[i][jp] + con1[i][jm] + con2[i][jm] - 4.0 * con1[i][j] - 4.0 * con2[i][j]) / dx / dx;
@@ -272,8 +262,8 @@ start:;
     }
 
     // Set the boundary value to a value of inner grid (isolated box)
-    con_new[ndm][j] = con_new[ndm - 1][j];
-    con_new[0][j] = con_new[1][j];
+    // con_new[ndm][j] = con_new[ndm - 1][j];
+    // con_new[0][j] = con_new[1][j];
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
@@ -319,11 +309,11 @@ start:;
             jm = j - 1;
             if (i == ndm)
             {
-                ip = ndm - 1;
+                ip = 0;
             }
             if (i == 0)
             {
-                im = 1;
+                im = ndm;
             }
             if (j == ndm)
             {
