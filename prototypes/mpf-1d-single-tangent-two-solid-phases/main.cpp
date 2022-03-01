@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define N 2
+#define N 3
 #define ND 400
 #define PI 3.14159
 
@@ -36,21 +36,21 @@ double F0 = 5.0e4;
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
 
-double temp = 1000.0; // K
+double temp = 600.0; // K
 double Te = 800.0;
 double ce = 0.4;
 
-// double ml = -2000.0;
-// double kap = 0.25;
-// double c00 = ce + (temp - Te) / ml;
-// double c10 = c00 * kap;
+double ml1 = -2000.0;
+double kap1 = 0.25;
+double c010 = ce + (temp - Te) / ml1;
+double c10 = c010 * kap1;
 
-double ml = 2000.0;
-double kap = 1.25;
-double c00 = ce + (temp - Te) / ml;
-double c10 = c00 * kap;
+double ml2 = 2000.0;
+double kap2 = 2.5;
+double c020 = ce + (temp - Te) / ml2;
+double c20 = c020 * kap2;
 
-double con[ND], con_new[ND], con1[ND], con0[ND];
+double con[ND], con_new[ND], con1[ND], con2[ND], con0[ND];
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
@@ -111,17 +111,30 @@ int main(void)
         {
             phi[1][i] = 1.0;
             con1[i] = c10;
+            phi[2][i] = 0.0;
+            con2[i] = c20;
             phi[0][i] = 0.0;
-            con0[i] = c00;
+            con0[i] = c010;
+        }
+        else if (i >= ND * 7 / 8)
+        {
+            phi[2][i] = 1.0;
+            con2[i] = c20;
+            phi[1][i] = 0.0;
+            con1[i] = c10;
+            phi[0][i] = 0.0;
+            con0[i] = c020;
         }
         else
         {
             phi[1][i] = 0.0;
             con1[i] = c10;
+            phi[2][i] = 0.0;
+            con2[i] = c20;
             phi[0][i] = 1.0;
-            con0[i] = 0.55;
+            con0[i] = 0.4;
         }
-        con[i] = phi[1][i] * con1[i] + phi[0][i] * con0[i];
+        con[i] = phi[1][i] * con1[i] + phi[2][i] * con2[i] + phi[0][i] * con0[i];
         con_new[i] = con[i];
         sum1 += con[i];
     }
@@ -165,49 +178,43 @@ start:;
     // Calculate the concentration field in solid and liqud phase based on local concentration and equilibrium rule.
     for (i = 0; i <= ndm; i++)
     {
+        // pure solid and solid in mixer
         con1[i] = c10;
-        if (phi[0][i] == 0)
+        con2[i] = c20;
+        // liquid in pure phase 1 or phase 2 or their mixer
+        if (phi[0][i] == 0.0)
         {
-            con0[i] = c00;
+            con0[i] = c010 * phi[1][0] + c020 * phi[2][0];
         }
-        else
+        // liquid in a mixer with phase 1
+        else if (phi[0][i] > 0.0 && phi[2][i] == 0.0)
         {
             con0[i] = (con[i] - phi[1][i] * con1[i]) / phi[0][i];
+            if (con0[i] >= c010)
+            {
+                con0[i] = c010;
+            }
         }
-        // if (con1[i] >= 1.0)
-        // {
-        //     con1[i] = 1.0;
-        // }
-        // if (con1[i] <= c10)
-        // {
-        //     con1[i] = c10;
-        // }
-        // if (con0[i] >= c00)
-        // {
-        //     con0[i] = c00;
-        // }
-        // if (con0[i] <= 0.0)
-        // {
-        //     con0[i] = 0.0;
-        // }
-        if (con1[i] >= c10)
+        // liquid in a mixer with phase 2
+        else if (phi[0][i] > 0.0 && phi[1][i] == 0.0)
         {
-            con1[i] = c10;
+            con0[i] = (con[i] - phi[2][i] * con2[i]) / phi[0][i];
+            if (con0[i] <= c020)
+            {
+                con0[i] = c020;
+            }
         }
-        if (con1[i] <= 0.0)
+        // liquid in a mixer with phase 2 and phase 1
+        else if (phi[0][i] > 0.0 && phi[1][i] >= 0.0 && phi[2][i] >= 0.0)
         {
-            con1[i] = 0.0;
-        }
-        if (con0[i] >= 1.0)
-        {
-            con0[i] = 1.0;
-        }
-        if (con0[i] <= c00)
-        {
-            con0[i] = c00;
+            con0[i] = (con[i] - phi[2][i] * con2[i] - phi[1][i] * con1[i]) / phi[0][i];
+            if (con0[i] > 1.0)
+            {
+                con0[i] = c0;
+            }
         }
         // The local concentation should be re-assigned after setting cons and conl (very important)
-        con[i] = con1[i] * phi[1][i] + con0[i] * phi[0][i];
+        con[i] = con1[i] * phi[1][i] + phi[2][i] * con2[i] + con0[i] * phi[0][i];
     }
 
     // Evolution Equation of Concentration field
@@ -215,9 +222,9 @@ start:;
     {
         ip = i + 1;
         im = i - 1;
-        dev1_s = 0.25 * ((phi[1][ip] - phi[1][im]) * (con1[ip] - con1[im])) / dx / dx;
+        dev1_s = 0.25 * ((phi[1][ip] + phi[2][ip] - phi[1][im] - phi[2][im]) * (con1[ip] + con2[ip] - con1[im] - con2[im])) / dx / dx;
         dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (con0[ip] - con0[im])) / dx / dx;
-        dev2_s = phi[1][i] * (con1[ip] + con1[im] - 2.0 * con1[i]) / dx / dx;
+        dev2_s = (phi[1][i] + phi[1][i]) * (con1[ip] + con2[ip] + con1[im] + con2[im] - 2.0 * con1[i] - 2.0 * con2[i]) / dx / dx;
         dev2_l = phi[0][i] * (con0[ip] + con0[im] - 2.0 * con0[i]) / dx / dx;
 
         cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
@@ -285,21 +292,21 @@ start:;
 
                     sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i];
                 }
-                // if (ii != 0 && jj == 0)
-                // {
-                //     dF = F0 * (c00 - con0[i]) * 40;
-                // }
-                // else if (ii == 0 && jj != 0)
-                // {
-                //     dF = -F0 * (c00 - con0[i]) * 40;
-                // }
-                if (ii != 0 && jj == 0)
+                if (ii == 1 && jj == 0)
                 {
-                    dF = -F0 * (c00 - con0[i]) * 40;
+                    dF = F0 * (c010 - con0[i]) * 40;
                 }
-                else if (ii == 0 && jj != 0)
+                else if (ii == 0 && jj == 1)
                 {
-                    dF = F0 * (c00 - con0[i]) * 40;
+                    dF = -F0 * (c010 - con0[i]) * 40;
+                }
+                else if (ii == 2 && jj == 0)
+                {
+                    dF = -F0 * (c020 - con0[i]) * 40;
+                }
+                else if (ii == 0 && jj == 2)
+                {
+                    dF = F0 * (c020 - con0[i]) * 40;
                 }
                 else
                 {
