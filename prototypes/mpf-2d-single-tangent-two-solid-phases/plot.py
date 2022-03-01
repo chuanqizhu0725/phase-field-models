@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-step_arr = np.arange(0, 10001, 1000)
+step_arr = np.arange(0, 5001, 1000)
 for step in step_arr:
     df = pd.read_csv(f"data/con/2d{step}.csv", header=None)
     arr = df[0].values

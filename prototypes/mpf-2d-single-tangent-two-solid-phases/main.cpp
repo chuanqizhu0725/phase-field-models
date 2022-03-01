@@ -52,13 +52,20 @@ double kap2 = 2.5;
 double c02e = ce + (temp - Te) / ml2;
 double c2e = c02e * kap2;
 
-double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+double c0, dc0;
+
+double phis, phil;
+
+double cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
 
 double con[ND][ND], con_new[ND][ND], con1[ND][ND], con2[ND][ND], con0[ND][ND];
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][ND][ND], phi_new[N][ND][ND];
+
+double phis_ij, phis_ipj, phis_imj, phis_ijp, phis_ijm;
+double cons_ij, cons_ipj, cons_imj, cons_ijp, cons_ijm;
 
 int phinum;
 int phiNum[ND][ND];
@@ -262,9 +269,21 @@ start:;
                 jm = ndm;
             }
 
-            dev1_s = 0.25 * ((phi[1][ip][j] + phi[2][ip][j] - phi[1][im][j] - phi[2][im][j]) * (con1[ip][j] + con2[ip][j] - con1[im][j] - con2[im][j]) + (phi[1][i][jp] + phi[2][i][jp] - phi[1][i][jm] - phi[2][i][jm]) * (con1[i][jp] + con2[i][jp] - con1[i][jm] - con2[i][jm])) / dx / dx;
+            phis_ij = phi[1][i][j] + phi[2][i][j];
+            phis_ipj = phi[1][ip][j] + phi[2][ip][j];
+            phis_imj = phi[1][im][j] + phi[2][im][j];
+            phis_ijp = phi[1][i][jp] + phi[2][i][jp];
+            phis_ijm = phi[1][i][jm] + phi[2][i][jm];
+
+            cons_ij = con1[i][j] + con2[i][j];
+            cons_ipj = con1[ip][j] + con2[ip][j];
+            cons_imj = con1[im][j] + con2[im][j];
+            cons_ijp = con1[i][jp] + con2[i][jp];
+            cons_ijm = con1[i][jm] + con2[i][jm];
+
+            dev1_s = 0.25 * ((phis_ipj - phis_imj) * (cons_ipj - cons_imj) + (phis_ijp - phis_ijm) * (cons_ijp - cons_ijm)) / dx / dx;
             dev1_l = 0.25 * ((phi[0][ip][j] - phi[0][im][j]) * (con0[ip][j] - con0[im][j]) + (phi[0][i][jp] - phi[0][i][jm]) * (con0[i][jp] - con0[i][jm])) / dx / dx;
-            dev2_s = (phi[1][i][j] + phi[2][i][j]) * (con1[ip][j] + con2[ip][j] + con1[im][j] + con2[im][j] + con1[i][jp] + con2[i][jp] + con1[i][jm] + con2[i][jm] - 4.0 * con1[i][j] - 4.0 * con2[i][j]) / dx / dx;
+            dev2_s = (phis_ij) * (cons_ipj + cons_imj + cons_ijp + cons_ijm - 4.0 * cons_ij) / dx / dx;
             dev2_l = phi[0][i][j] * (con0[ip][j] + con0[im][j] + con0[i][jp] + con0[i][jm] - 4.0 * con0[i][j]) / dx / dx;
 
             cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
