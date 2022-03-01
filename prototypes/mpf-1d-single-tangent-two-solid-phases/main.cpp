@@ -42,12 +42,12 @@ double ml = -2000.0;
 double ce = 0.4;
 double kap = 0.25;
 // double kap2 = 1.25;
-double cl0 = ce + (temp - Te) / ml;
+double c00 = ce + (temp - Te) / ml;
 // double cl20 = ce + (temp - Te) / ml2;
-double cs0 = cl0 * kap;
+double c10 = c00 * kap;
 // double cs20 = cl20 * kap2;
 
-double con[ND], con2[ND], cons[ND], conl[ND];
+double con[ND], con_new[ND], con1[ND], con0[ND];
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
@@ -107,19 +107,19 @@ int main(void)
         if (i <= ND / 8)
         {
             phi[1][i] = 1.0;
-            cons[i] = cs0;
+            con1[i] = c10;
             phi[0][i] = 0.0;
-            conl[i] = cl0;
+            con0[i] = c00;
         }
         else
         {
             phi[1][i] = 0.0;
-            cons[i] = cs0;
+            con1[i] = c10;
             phi[0][i] = 1.0;
-            conl[i] = 0.2;
+            con0[i] = 0.2;
         }
-        con[i] = phi[1][i] * cons[i] + phi[0][i] * conl[i];
-        con2[i] = con[i];
+        con[i] = phi[1][i] * con1[i] + phi[0][i] * con0[i];
+        con_new[i] = con[i];
         sum1 += con[i];
     }
     c0 = sum1 / ND;
@@ -162,33 +162,33 @@ start:;
     // Calculate the concentration field in solid and liqud phase based on local concentration and equilibrium rule.
     for (i = 0; i <= ndm; i++)
     {
-        cons[i] = cs0;
+        con1[i] = c10;
         if (phi[0][i] == 0)
         {
-            conl[i] = cl0;
+            con0[i] = c00;
         }
         else
         {
-            conl[i] = (con[i] - phi[1][i] * cons[i]) / phi[0][i];
+            con0[i] = (con[i] - phi[1][i] * con1[i]) / phi[0][i];
         }
-        if (cons[i] >= 1.0)
+        if (con1[i] >= 1.0)
         {
-            cons[i] = 1.0;
+            con1[i] = 1.0;
         }
-        if (cons[i] <= cs0)
+        if (con1[i] <= c10)
         {
-            cons[i] = cs0;
+            con1[i] = c10;
         }
-        if (conl[i] >= cl0)
+        if (con0[i] >= c00)
         {
-            conl[i] = cl0;
+            con0[i] = c00;
         }
-        if (conl[i] <= 0.0)
+        if (con0[i] <= 0.0)
         {
-            conl[i] = 0.0;
+            con0[i] = 0.0;
         }
         // The local concentation should be re-assigned after setting cons and conl (very important)
-        con[i] = cons[i] * phi[1][i] + conl[i] * phi[0][i];
+        con[i] = con1[i] * phi[1][i] + con0[i] * phi[0][i];
     }
 
     // Evolution Equation of Concentration field
@@ -196,22 +196,22 @@ start:;
     {
         ip = i + 1;
         im = i - 1;
-        dev1_s = 0.25 * ((phi[1][ip] - phi[1][im]) * (cons[ip] - cons[im])) / dx / dx;
-        dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (conl[ip] - conl[im])) / dx / dx;
-        dev2_s = phi[1][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
-        dev2_l = phi[0][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
+        dev1_s = 0.25 * ((phi[1][ip] - phi[1][im]) * (con1[ip] - con1[im])) / dx / dx;
+        dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (con0[ip] - con0[im])) / dx / dx;
+        dev2_s = phi[1][i] * (con1[ip] + con1[im] - 2.0 * con1[i]) / dx / dx;
+        dev2_l = phi[0][i] * (con0[ip] + con0[im] - 2.0 * con0[i]) / dx / dx;
 
         cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
-        con2[i] = con[i] + cddtt * dtime;
+        con_new[i] = con[i] + cddtt * dtime;
         // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
     }
 
     // Set the boundary value to a value of inner grid (isolated box)
-    con2[ndm] = con2[ndm - 1];
-    con2[0] = con2[1];
+    con_new[ndm] = con_new[ndm - 1];
+    con_new[0] = con_new[1];
     for (i = 0; i <= ndm; i++)
     {
-        con[i] = con2[i];
+        con[i] = con_new[i];
     }
 
     sum1 = 0.0;
@@ -268,11 +268,11 @@ start:;
                 }
                 if (ii != 0 && jj == 0)
                 {
-                    dF = F0 * (cl0 - conl[i]) * 40;
+                    dF = F0 * (c00 - con0[i]) * 40;
                 }
                 else if (ii == 0 && jj != 0)
                 {
-                    dF = -F0 * (cl0 - conl[i]) * 40;
+                    dF = -F0 * (c00 - con0[i]) * 40;
                 }
                 else
                 {
@@ -357,7 +357,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "%e   ", con1[i]);
         fprintf(streamcs, "\n");
     }
     fclose(streamcs);
@@ -369,7 +369,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamcl, "%e   ", conl[i]);
+        fprintf(streamcl, "%e   ", con0[i]);
         fprintf(streamcl, "\n");
     }
     fclose(streamcl);
