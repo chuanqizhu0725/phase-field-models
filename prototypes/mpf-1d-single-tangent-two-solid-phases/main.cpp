@@ -35,17 +35,20 @@ double F0 = 5.0e4;
 
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
+
 double temp = 1000.0; // K
 double Te = 800.0;
-double ml = -2000.0;
-// double ml2 = 2000.0;
 double ce = 0.4;
-double kap = 0.25;
-// double kap2 = 1.25;
+
+// double ml = -2000.0;
+// double kap = 0.25;
+// double c00 = ce + (temp - Te) / ml;
+// double c10 = c00 * kap;
+
+double ml = 2000.0;
+double kap = 1.25;
 double c00 = ce + (temp - Te) / ml;
-// double cl20 = ce + (temp - Te) / ml2;
 double c10 = c00 * kap;
-// double cs20 = cl20 * kap2;
 
 double con[ND], con_new[ND], con1[ND], con0[ND];
 
@@ -116,7 +119,7 @@ int main(void)
             phi[1][i] = 0.0;
             con1[i] = c10;
             phi[0][i] = 1.0;
-            con0[i] = 0.2;
+            con0[i] = 0.55;
         }
         con[i] = phi[1][i] * con1[i] + phi[0][i] * con0[i];
         con_new[i] = con[i];
@@ -171,21 +174,37 @@ start:;
         {
             con0[i] = (con[i] - phi[1][i] * con1[i]) / phi[0][i];
         }
-        if (con1[i] >= 1.0)
-        {
-            con1[i] = 1.0;
-        }
-        if (con1[i] <= c10)
+        // if (con1[i] >= 1.0)
+        // {
+        //     con1[i] = 1.0;
+        // }
+        // if (con1[i] <= c10)
+        // {
+        //     con1[i] = c10;
+        // }
+        // if (con0[i] >= c00)
+        // {
+        //     con0[i] = c00;
+        // }
+        // if (con0[i] <= 0.0)
+        // {
+        //     con0[i] = 0.0;
+        // }
+        if (con1[i] >= c10)
         {
             con1[i] = c10;
         }
-        if (con0[i] >= c00)
+        if (con1[i] <= 0.0)
+        {
+            con1[i] = 0.0;
+        }
+        if (con0[i] >= 1.0)
+        {
+            con0[i] = 1.0;
+        }
+        if (con0[i] <= c00)
         {
             con0[i] = c00;
-        }
-        if (con0[i] <= 0.0)
-        {
-            con0[i] = 0.0;
         }
         // The local concentation should be re-assigned after setting cons and conl (very important)
         con[i] = con1[i] * phi[1][i] + con0[i] * phi[0][i];
@@ -266,13 +285,21 @@ start:;
 
                     sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i];
                 }
+                // if (ii != 0 && jj == 0)
+                // {
+                //     dF = F0 * (c00 - con0[i]) * 40;
+                // }
+                // else if (ii == 0 && jj != 0)
+                // {
+                //     dF = -F0 * (c00 - con0[i]) * 40;
+                // }
                 if (ii != 0 && jj == 0)
                 {
-                    dF = F0 * (c00 - con0[i]) * 40;
+                    dF = -F0 * (c00 - con0[i]) * 40;
                 }
                 else if (ii == 0 && jj != 0)
                 {
-                    dF = -F0 * (c00 - con0[i]) * 40;
+                    dF = F0 * (c00 - con0[i]) * 40;
                 }
                 else
                 {
