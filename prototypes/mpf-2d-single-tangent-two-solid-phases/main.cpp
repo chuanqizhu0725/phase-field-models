@@ -17,7 +17,7 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 10001;
+int nstep = 5001;
 int pstep = 1000;
 
 double dx = 1.0e-7;
@@ -31,7 +31,7 @@ double mobi = 4.20951e-05;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 5.0e4;
+double F0 = 2.0e6;
 
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
@@ -150,6 +150,16 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
+
+        sum1 = 0.0;
+        for (i = 0; i <= ndm; i++)
+        {
+            for (j = 0; j <= ndm; j++)
+            {
+                sum1 += con[i][j];
+            }
+        }
+        cout << "nominal concentration is: " << sum1 / ND / ND << endl;
     }
 
     for (i = 0; i <= ndm; i++)
@@ -261,9 +271,6 @@ start:;
         }
     }
 
-    // Set the boundary value to a value of inner grid (isolated box)
-    // con_new[ndm][j] = con_new[ndm - 1][j];
-    // con_new[0][j] = con_new[1][j];
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
@@ -342,21 +349,21 @@ start:;
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j];
                     }
-                    if (ii == 1 && jj == 0)
+                    if (ii % 2 == 1 && jj == 0)
                     {
-                        dF = F0 * (c010 - con0[i][j]) * 40;
+                        dF = F0 * (c010 - con0[i][j]);
                     }
-                    else if (ii == 0 && jj == 1)
+                    else if (ii == 0 && jj % 2 == 1)
                     {
-                        dF = -F0 * (c010 - con0[i][j]) * 40;
+                        dF = -F0 * (c010 - con0[i][j]);
                     }
-                    else if (ii == 2 && jj == 0)
+                    else if (ii % 2 == 0 && jj == 0)
                     {
-                        dF = -F0 * (c020 - con0[i][j]) * 40;
+                        dF = -F0 * (c020 - con0[i][j]);
                     }
-                    else if (ii == 0 && jj == 2)
+                    else if (ii == 0 && jj % 2 == 0)
                     {
-                        dF = F0 * (c020 - con0[i][j]) * 40;
+                        dF = F0 * (c020 - con0[i][j]);
                     }
                     else
                     {
@@ -388,7 +395,6 @@ start:;
         }
     }
 
-    //
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
