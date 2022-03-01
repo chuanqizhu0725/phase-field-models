@@ -109,14 +109,6 @@ int main(void)
             phi[1][i] = 0.0;
             conl[i] = cl0;
         }
-        else if ((i > ND / 8) && (i <= (ND / 8 + delta / dx)))
-        {
-            dd = 1.0 - (i - ND / 8) * (1.0 / (delta / dx));
-            phi[0][i] = dd * dd * dd * (10.0 - 15.0 * dd + 6.0 * dd * dd);
-            cons[i] = cs0;
-            phi[1][i] = 1.0 - phi[0][i];
-            conl[i] = 0.2 + (cl0 - 0.2) * dd * dd * dd * (10.0 - 15.0 * dd + 6.0 * dd * dd);
-        }
         else
         {
             phi[0][i] = 0.0;
@@ -200,6 +192,7 @@ start:;
         {
             conl[i] = 0.0;
         }
+        // The local concentation should be re-assigned after setting cons and conl (very important)
         con[i] = cons[i] * phi[0][i] + conl[i] * phi[1][i];
     }
 
