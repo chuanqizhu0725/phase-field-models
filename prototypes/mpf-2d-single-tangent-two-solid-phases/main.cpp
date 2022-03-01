@@ -31,7 +31,8 @@ double mobi = 4.20951e-05;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 2.0e6;
+double F10 = 2.0e6;
+double F20 = 2.0e6;
 
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
@@ -39,22 +40,25 @@ double Dl = 0.5e-5;
 double temp = 600.0; // K
 double Te = 800.0;
 double ce = 0.4;
+double cl = 0.4;
 
 double ml1 = -2000.0;
 double kap1 = 0.25;
-double c010 = ce + (temp - Te) / ml1;
-double c10 = c010 * kap1;
+double c01e = ce + (temp - Te) / ml1;
+double c1e = c01e * kap1;
 
 double ml2 = 2000.0;
 double kap2 = 2.5;
-double c020 = ce + (temp - Te) / ml2;
-double c20 = c020 * kap2;
+double c02e = ce + (temp - Te) / ml2;
+double c2e = c02e * kap2;
+
+double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
 
 double con[ND][ND], con_new[ND][ND], con1[ND][ND], con2[ND][ND], con0[ND][ND];
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
-double phi[N][ND][ND], phi2[N][ND][ND];
+double phi[N][ND][ND], phi_new[N][ND][ND];
 
 int phinum;
 int phiNum[ND][ND];
@@ -70,8 +74,6 @@ double pddtt, sum1;
 double termiikk, termjjkk;
 
 double dF;
-
-double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
 
 void datasave(int step);
 
@@ -112,29 +114,29 @@ int main(void)
             if (i <= ND / 8 && j < ND / 2)
             {
                 phi[1][i][j] = 1.0;
-                con1[i][j] = c10;
+                con1[i][j] = c1e;
                 phi[2][i][j] = 0.0;
-                con2[i][j] = c20;
+                con2[i][j] = c2e;
                 phi[0][i][j] = 0.0;
-                con0[i][j] = c010;
+                con0[i][j] = c01e;
             }
             else if (i <= ND / 8 && j >= ND / 2)
             {
                 phi[2][i][j] = 1.0;
-                con2[i][j] = c20;
+                con2[i][j] = c2e;
                 phi[1][i][j] = 0.0;
-                con1[i][j] = c10;
+                con1[i][j] = c1e;
                 phi[0][i][j] = 0.0;
-                con0[i][j] = c020;
+                con0[i][j] = c02e;
             }
             else
             {
                 phi[1][i][j] = 0.0;
-                con1[i][j] = c10;
+                con1[i][j] = c1e;
                 phi[2][i][j] = 0.0;
-                con2[i][j] = c20;
+                con2[i][j] = c2e;
                 phi[0][i][j] = 1.0;
-                con0[i][j] = 0.4;
+                con0[i][j] = cl;
             }
             con[i][j] = phi[1][i][j] * con1[i][j] + phi[2][i][j] * con2[i][j] + phi[0][i][j] * con0[i][j];
             con_new[i][j] = con[i][j];
@@ -209,24 +211,24 @@ start:;
     {
         for (j = 0; j <= ndm; j++)
         {
-            con1[i][j] = c10;
-            con2[i][j] = c20;
+            con1[i][j] = c1e;
+            con2[i][j] = c2e;
             // liquid in pure phase 1 or phase 2 or their mixer
             if (phi[0][i][j] == 0.0)
             {
-                con0[i][j] = c010 * phi[1][i][j] + c020 * phi[2][i][j];
+                con0[i][j] = c01e * phi[1][i][j] + c02e * phi[2][i][j];
             }
             // liquid in phase 2 or phase 1 or their mixer
             else if (phi[0][i][j] > 0.0 || (phi[1][i][j] >= 0.0 || phi[2][i][j] >= 0.0))
             {
                 con0[i][j] = (con[i][j] - phi[2][i][j] * con2[i][j] - phi[1][i][j] * con1[i][j]) / phi[0][i][j];
-                if (con0[i][j] >= c010)
+                if (con0[i][j] >= c01e)
                 {
-                    con0[i][j] = c010;
+                    con0[i][j] = c01e;
                 }
-                else if (con0[i][j] <= c020)
+                else if (con0[i][j] <= c02e)
                 {
-                    con0[i][j] = c020;
+                    con0[i][j] = c02e;
                 }
             }
             // The local concentation should be re-assigned after setting cons and conl (very important)
@@ -351,19 +353,19 @@ start:;
                     }
                     if (ii % 2 == 1 && jj == 0)
                     {
-                        dF = F0 * (c010 - con0[i][j]);
+                        dF = F10 * (c01e - con0[i][j]);
                     }
                     else if (ii == 0 && jj % 2 == 1)
                     {
-                        dF = -F0 * (c010 - con0[i][j]);
+                        dF = -F10 * (c01e - con0[i][j]);
                     }
                     else if (ii % 2 == 0 && jj == 0)
                     {
-                        dF = -F0 * (c020 - con0[i][j]);
+                        dF = -F20 * (c02e - con0[i][j]);
                     }
                     else if (ii == 0 && jj % 2 == 0)
                     {
-                        dF = F0 * (c020 - con0[i][j]);
+                        dF = F20 * (c02e - con0[i][j]);
                     }
                     else
                     {
@@ -371,14 +373,14 @@ start:;
                     }
                     pddtt += -2.0 * mij[ii][jj] / double(phiNum[i][j]) * (sum1 - 8.0 / PI * dF * sqrt(phi[ii][i][j] * phi[jj][i][j]));
                 }
-                phi2[ii][i][j] = phi[ii][i][j] + pddtt * dtime;
-                if (phi2[ii][i][j] >= 1.0)
+                phi_new[ii][i][j] = phi[ii][i][j] + pddtt * dtime;
+                if (phi_new[ii][i][j] >= 1.0)
                 {
-                    phi2[ii][i][j] = 1.0;
+                    phi_new[ii][i][j] = 1.0;
                 }
-                if (phi2[ii][i][j] <= 0.0)
+                if (phi_new[ii][i][j] <= 0.0)
                 {
-                    phi2[ii][i][j] = 0.0;
+                    phi_new[ii][i][j] = 0.0;
                 }
             }
         } // i
@@ -390,7 +392,7 @@ start:;
         {
             for (k = 0; k <= nm; k++)
             {
-                phi[k][i][j] = phi2[k][i][j];
+                phi[k][i][j] = phi_new[k][i][j];
             }
         }
     }
