@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 5001;
-int pstep = 1000;
+int nstep = 50001;
+int pstep = 100;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -36,6 +36,7 @@ double F20 = 2.0e6;
 
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
+// double Dl = 0.1e-5;
 
 double temp = 600.0; // K
 double Te = 800.0;
@@ -119,6 +120,7 @@ int main(void)
         for (j = 0; j <= ndm; j++)
         {
             if (i <= ND / 8 && j < ND / 2)
+            // if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 100)
             {
                 phi[1][i][j] = 1.0;
                 con1[i][j] = c1e;
@@ -225,8 +227,26 @@ start:;
             {
                 con0[i][j] = c01e * phi[1][i][j] + c02e * phi[2][i][j];
             }
-            // liquid in phase 2 or phase 1 or their mixer
-            else if (phi[0][i][j] > 0.0 || (phi[1][i][j] >= 0.0 || phi[2][i][j] >= 0.0))
+            // liquid in phase 1
+            else if (phi[0][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[2][i][j] == 0.0)
+            {
+                con0[i][j] = (con[i][j] - phi[1][i][j] * con1[i][j]) / phi[0][i][j];
+                if (con0[i][j] >= c01e)
+                {
+                    con0[i][j] = c01e;
+                }
+            }
+            // liquid in phase 2
+            else if (phi[0][i][j] > 0.0 && phi[2][i][j] > 0.0 && phi[1][i][j] == 0.0)
+            {
+                con0[i][j] = (con[i][j] - phi[2][i][j] * con2[i][j]) / phi[0][i][j];
+                if (con0[i][j] <= c02e)
+                {
+                    con0[i][j] = c02e;
+                }
+            }
+            // liquid in mixer of phase 1 and 2
+            else if (phi[0][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[2][i][j] > 0.0)
             {
                 con0[i][j] = (con[i][j] - phi[2][i][j] * con2[i][j] - phi[1][i][j] * con1[i][j]) / phi[0][i][j];
                 if (con0[i][j] >= c01e)
@@ -237,6 +257,11 @@ start:;
                 {
                     con0[i][j] = c02e;
                 }
+            }
+            // pure liquid
+            else if ((phi[0][i][j] == 1.0 && phi[1][i][j] == 0.0 && phi[2][i][j] == 0.0))
+            {
+                con0[i][j] = con[i][j];
             }
             // The local concentation should be re-assigned after setting cons and conl (very important)
             con[i][j] = con1[i][j] * phi[1][i][j] + phi[2][i][j] * con2[i][j] + con0[i][j] * phi[0][i][j];
@@ -370,19 +395,19 @@ start:;
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j];
                     }
-                    if (ii % 2 == 1 && jj == 0)
+                    if (ii == 1 && jj == 0)
                     {
                         dF = F10 * (c01e - con0[i][j]);
                     }
-                    else if (ii == 0 && jj % 2 == 1)
+                    else if (ii == 0 && jj == 1)
                     {
                         dF = -F10 * (c01e - con0[i][j]);
                     }
-                    else if (ii % 2 == 0 && jj == 0)
+                    else if (ii == 2 && jj == 0)
                     {
                         dF = -F20 * (c02e - con0[i][j]);
                     }
-                    else if (ii == 0 && jj % 2 == 0)
+                    else if (ii == 0 && jj == 2)
                     {
                         dF = F20 * (c02e - con0[i][j]);
                     }
