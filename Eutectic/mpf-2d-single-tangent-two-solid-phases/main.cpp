@@ -11,22 +11,24 @@
 using namespace std;
 
 #define N 3
-#define ND 100
+#define ND 400
 #define PI 3.14159
+#define DRND(x) ((double)(x) / RAND_MAX * rand()) //乱数の関数設定
 
 int nm = N - 1;
 int ndm = ND - 1;
 
 int nstep = 50001;
-int pstep = 100;
+int pstep = 500;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
 
 double gamma0 = 0.1;
+double astre = 0.05;
 double delta = 5.0 * dx;
 
-double mobi = 4.0e-5;
+double mobi = 4.2e-5;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
@@ -35,13 +37,12 @@ double F10 = 2.0e6;
 double F20 = 2.0e6;
 
 double Ds = 0.1e-6;
-double Dl = 0.5e-5;
-// double Dl = 0.1e-5;
+double Dl = 0.2e-5;
 
 double temp = 600.0; // K
 double Te = 800.0;
 double ce = 0.4;
-double cl = 0.4;
+double cl = 0.2;
 
 double ml1 = -2000.0;
 double kap1 = 0.25;
@@ -61,7 +62,7 @@ double cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
 
 double con[ND][ND], con_new[ND][ND], con1[ND][ND], con2[ND][ND], con0[ND][ND];
 
-double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
+double mij[N][N], aij[N][N], wij[N][N], fij[N][N], anij[N][N], thij[N][N];
 
 double phi[N][ND][ND], phi_new[N][ND][ND];
 
@@ -79,11 +80,18 @@ int istep;
 double dd;
 
 double pddtt, sum1;
+
+double theta, theta0;
+double epsilon0;
 double termiikk, termjjkk;
+
+double phidx, phidy, phidxx, phidyy, phidxy;
+double ep, ep1p, ep2p;
 
 double dF;
 
 void datasave(int step);
+double calcTheta(double dy, double dx);
 
 int main(void)
 {
@@ -105,11 +113,18 @@ int main(void)
             wij[i][j] = W0;
             aij[i][j] = A0;
             mij[i][j] = M0;
+            anij[i][j] = false;
+            thij[i][j] = 0.0;
+            if ((i == 0) || (j == 0))
+            {
+                anij[i][j] = true;
+            }
             if (i == j)
             {
                 wij[i][j] = 0.0;
                 aij[i][j] = 0.0;
                 mij[i][j] = 0.0;
+                anij[i][j] = false;
             }
         }
     }
@@ -119,8 +134,8 @@ int main(void)
     {
         for (j = 0; j <= ndm; j++)
         {
-            if (i <= ND / 8 && j < ND / 2)
-            // if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 100)
+            // if (i <= ND / 8)
+            if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 25)
             {
                 phi[1][i][j] = 1.0;
                 con1[i][j] = c1e;
@@ -129,15 +144,15 @@ int main(void)
                 phi[0][i][j] = 0.0;
                 con0[i][j] = c01e;
             }
-            else if (i <= ND / 8 && j >= ND / 2)
-            {
-                phi[2][i][j] = 1.0;
-                con2[i][j] = c2e;
-                phi[1][i][j] = 0.0;
-                con1[i][j] = c1e;
-                phi[0][i][j] = 0.0;
-                con0[i][j] = c02e;
-            }
+            // else if (i <= ND / 8 && j >= ND / 2)
+            // {
+            //     phi[2][i][j] = 1.0;
+            //     con2[i][j] = c2e;
+            //     phi[1][i][j] = 0.0;
+            //     con1[i][j] = c1e;
+            //     phi[0][i][j] = 0.0;
+            //     con0[i][j] = c02e;
+            // }
             else
             {
                 phi[1][i][j] = 0.0;
@@ -269,30 +284,30 @@ start:;
     }
 
     // Evolution Equation of Concentration field
-    for (i = 0; i <= ndm; i++)
+    for (i = 1; i <= ndm - 1; i++)
     {
-        for (j = 0; j <= ndm; j++)
+        for (j = 1; j <= ndm - 1; j++)
         {
             ip = i + 1;
             im = i - 1;
             jp = j + 1;
             jm = j - 1;
-            if (i == ndm)
-            {
-                ip = 0;
-            }
-            if (i == 0)
-            {
-                im = ndm;
-            }
-            if (j == ndm)
-            {
-                jp = 0;
-            }
-            if (j == 0)
-            {
-                jm = ndm;
-            }
+            // if (i == ndm)
+            // {
+            //     ip = 0;
+            // }
+            // if (i == 0)
+            // {
+            //     im = ndm;
+            // }
+            // if (j == ndm)
+            // {
+            //     jp = 0;
+            // }
+            // if (j == 0)
+            // {
+            //     jm = ndm;
+            // }
 
             phis_ij = phi[1][i][j] + phi[2][i][j];
             phis_ipj = phi[1][ip][j] + phi[2][ip][j];
@@ -312,7 +327,7 @@ start:;
             dev2_l = phi[0][i][j] * (con0[ip][j] + con0[im][j] + con0[i][jp] + con0[i][jm] - 4.0 * con0[i][j]) / dx / dx;
 
             cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
-            con_new[i][j] = con[i][j] + cddtt * dtime;
+            con_new[i][j] = con[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
             // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
         }
     }
@@ -389,9 +404,43 @@ start:;
                     {
                         kk = phiIdx[n3][i][j];
 
-                        termiikk = aij[ii][kk] * (phi[kk][ip][j] + phi[kk][im][j] + phi[kk][i][jp] + phi[kk][i][jm] - 4.0 * phi[kk][i][j]) / (dx * dx);
+                        phidx = (phi[kk][ip][j] - phi[kk][im][j]) / 2.0 / dx; //フェーズフィールドの空間１階微分
+                        phidy = (phi[kk][i][jp] - phi[kk][i][jm]) / 2.0 / dx;
+                        phidxx = (phi[kk][ip][j] + phi[kk][im][j] - 2.0 * phi[kk][i][j]) / (dx * dx); //フェーズフィールドの空間２階微分
+                        phidyy = (phi[kk][i][jp] + phi[kk][i][jm] - 2.0 * phi[kk][i][j]) / (dx * dx);
+                        phidxy = (phi[kk][ip][jp] + phi[kk][im][jm] - phi[kk][im][jp] - phi[kk][ip][jm]) / 4.0 / (dx * dx);
 
-                        termjjkk = aij[jj][kk] * (phi[kk][ip][j] + phi[kk][im][j] + phi[kk][i][jp] + phi[kk][i][jm] - 4.0 * phi[kk][i][j]) / (dx * dx);
+                        if (anij[ii][kk])
+                        {
+                            epsilon0 = sqrt(aij[ii][kk]);
+                            theta0 = thij[ii][kk];
+                            theta = calcTheta(phidy, phidx);                                    //界面の法線方向の角度[式(4.24)]
+                            ep = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));        //勾配エネルギー係数の平方根[式(4.23)]
+                            ep1p = -epsilon0 * astre * 4.0 * sin(4.0 * (theta - theta0));       // epの角度による１階微分
+                            ep2p = -epsilon0 * astre * 4.0 * 4.0 * cos(4.0 * (theta - theta0)); // epの角度による２階微分
+
+                            termiikk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
+                        }
+                        else
+                        {
+                            termiikk = aij[ii][kk] * (phi[kk][ip][j] + phi[kk][im][j] + phi[kk][i][jp] + phi[kk][i][jm] - 4.0 * phi[kk][i][j]) / (dx * dx);
+                        }
+
+                        if (anij[jj][kk])
+                        {
+                            epsilon0 = sqrt(aij[jj][kk]);
+                            theta0 = thij[jj][kk];
+                            theta = calcTheta(phidy, phidx);                                    //界面の法線方向の角度[式(4.24)]
+                            ep = epsilon0 * (1.0 + astre * cos(4.0 * (theta - theta0)));        //勾配エネルギー係数の平方根[式(4.23)]
+                            ep1p = -epsilon0 * astre * 4.0 * sin(4.0 * (theta - theta0));       // epの角度による１階微分
+                            ep2p = -epsilon0 * astre * 4.0 * 4.0 * cos(4.0 * (theta - theta0)); // epの角度による２階微分
+
+                            termjjkk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
+                        }
+                        else
+                        {
+                            termjjkk = aij[jj][kk] * (phi[kk][ip][j] + phi[kk][im][j] + phi[kk][i][jp] + phi[kk][i][jm] - 4.0 * phi[kk][i][j]) / (dx * dx);
+                        }
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j];
                     }
@@ -528,4 +577,24 @@ void datasave(int step)
         }
     }
     fclose(streamcl);
+}
+
+double calcTheta(double dy, double dx)
+{
+    if (dx != 0.0)
+    {
+        return atan(dy / dx);
+    }
+    else if (dx == 0.0 && dy > 0)
+    {
+        return PI / 2.0;
+    }
+    else if (dx == 0.0 && dy < 0)
+    {
+        return PI / (-2.0);
+    }
+    else
+    {
+        return 0;
+    }
 }
