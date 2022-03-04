@@ -1,0 +1,1 @@
+mpicc main-mpi.c -o main-mpi && mpirun -n 6 ./main-mpi
