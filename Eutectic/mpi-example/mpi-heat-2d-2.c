@@ -21,7 +21,7 @@ struct Parms
 int main(int argc, char *argv[])
 {
     void inidat(), update(), prtdat();
-    float u[2][NX][NY];
+
     int taskid,
         numworkers,
         numtasks,
@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
 
     numworkers = numtasks - 1;
 
+    rows = NX / numworkers;
+
     /************************* master code *******************************/
     if (taskid == MASTER)
     {
@@ -49,13 +51,12 @@ int main(int argc, char *argv[])
             MPI_Abort(MPI_COMM_WORLD, rc);
             exit(1);
         }
+        float u[2][NX][NY];
         inidat(NX, NY, &u[0]);
         // inidat(NX, NY, u);
         prtdat(NX, NY, &u[0], "initial.dat");
 
-        rows = NX / numworkers;
         offset = 0;
-
         // Send to workers
         for (i = 1; i <= numworkers; i++)
         {
@@ -96,9 +97,10 @@ int main(int argc, char *argv[])
     /************************* workers code **********************************/
     if (taskid != MASTER)
     {
+        float u[2][rows + 2][NY];
         // Initialize with zero
         for (iz = 0; iz < 2; iz++)
-            for (ix = 0; ix < NX; ix++)
+            for (ix = 0; ix < rows + 2; ix++)
                 for (iy = 0; iy < NY; iy++)
                     u[iz][ix][iy] = 0.0;
 
@@ -109,7 +111,7 @@ int main(int argc, char *argv[])
         MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&up, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&down, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&u[0][offset], rows * NY, MPI_FLOAT, source, msgtype,
+        MPI_Recv(&u[0][1], rows * NY, MPI_FLOAT, source, msgtype,
                  MPI_COMM_WORLD, &status);
 
         iz = 0;
@@ -118,30 +120,34 @@ int main(int argc, char *argv[])
             // Communicate with neighor works before computation
             if (up != NONE)
             {
-                MPI_Send(&u[iz][offset], NY, MPI_FLOAT, up,
+                MPI_Send(&u[iz][1], NY, MPI_FLOAT, up,
                          DTAG, MPI_COMM_WORLD);
                 source = up;
                 msgtype = UTAG;
-                MPI_Recv(&u[iz][offset - 1], NY, MPI_FLOAT, source,
+                MPI_Recv(&u[iz][0], NY, MPI_FLOAT, source,
                          msgtype, MPI_COMM_WORLD, &status);
             }
             if (down != NONE)
             {
-                MPI_Send(&u[iz][offset + rows - 1], NY, MPI_FLOAT, down,
+                MPI_Send(&u[iz][rows], NY, MPI_FLOAT, down,
                          UTAG, MPI_COMM_WORLD);
                 source = down;
                 msgtype = DTAG;
-                MPI_Recv(&u[iz][offset + rows], NY, MPI_FLOAT, source, msgtype,
+                MPI_Recv(&u[iz][rows + 1], NY, MPI_FLOAT, source, msgtype,
                          MPI_COMM_WORLD, &status);
             }
 
             // Compute after sending and receiving data
-            start = offset;
-            end = offset + rows - 1;
-            if (offset == 0)
-                start = 1;
-            if ((offset + rows) == NX)
+            start = 1;
+            end = rows;
+            if (up == NONE)
+            {
+                start = 2;
+            }
+            if (down == NONE)
+            {
                 end--;
+            }
             update(start, end, NY, &u[iz], &u[1 - iz]);
             iz = 1 - iz;
         }
@@ -149,7 +155,7 @@ int main(int argc, char *argv[])
         // Send final result to master
         MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-        MPI_Send(&u[iz][offset], rows * NY, MPI_FLOAT, MASTER, DONE,
+        MPI_Send(&u[iz][1], rows * NY, MPI_FLOAT, MASTER, DONE,
                  MPI_COMM_WORLD);
         MPI_Finalize();
     }

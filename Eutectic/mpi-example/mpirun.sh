@@ -1,1 +1,1 @@
-mpicc mpi-heat-2d.c -o main && mpirun -n 6 ./main
+mpicc mpi-heat-2d-2.c -o main && mpirun -n 6 ./main
