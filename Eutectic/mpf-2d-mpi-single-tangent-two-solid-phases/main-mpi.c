@@ -25,10 +25,14 @@ struct Parms
 
 int main(int argc, char *argv[])
 {
-    void inidat(), initialize(), savedata(), update(), prtdat();
+    void inidat(),
+        initialize(),
+        compute(),
+        savedata(),
+        update(),
+        prtdat();
 
     int nm = N - 1;
-    int ndxm = NX - 1;
 
     int nstep = 50001;
     int pstep = 500;
@@ -94,10 +98,6 @@ int main(int argc, char *argv[])
     //     }
     // }
 
-    int phinum;
-    int phiNum[NX][NY];
-    int phiIdx[N + 1][NX][NY];
-
     double c0, dc0;
 
     double phis, phil;
@@ -123,11 +123,9 @@ int main(int argc, char *argv[])
 
     double dF;
 
-    double con[2][NX][NY], con1[NX][NY], con2[NX][NY], con0[NX][NY];
+    int phiNum[NX][NY];
+    int phiIdx[N + 1][NX][NY];
 
-    double phi[2][N][NX][NY];
-
-    float u[2][NX][NY];
     int taskid,
         numworkers,
         numtasks,
@@ -146,6 +144,7 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
 
     numworkers = numtasks - 1;
+    rows = NX / numworkers;
 
     /************************* master code *******************************/
     if (taskid == MASTER)
@@ -155,14 +154,20 @@ int main(int argc, char *argv[])
             MPI_Abort(MPI_COMM_WORLD, rc);
             exit(1);
         }
+        double
+            con[2][NX][NY],
+            con1[NX][NY],
+            con2[NX][NY],
+            con0[NX][NY];
+
+        double phi[2][N][NX][NY];
 
         initialize(NX, NY, &phi[0][0], &phi[0][1], &phi[0][2], con0, con1, con2, con);
-        inidat(NX, NY, &u[0]);
+        float u[2][NX][NY];
+        inidat(NX, NY, &u);
         savedata(NX, NY, &phi[0][0], "initial.dat");
 
-        rows = NX / numworkers;
         offset = 0;
-
         // Send to workers
         for (i = 1; i <= numworkers; i++)
         {
@@ -180,12 +185,18 @@ int main(int argc, char *argv[])
             MPI_Send(&rows, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&up, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&down, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&u[0][offset], rows * NY, MPI_FLOAT, dest, BEGIN,
+                     MPI_COMM_WORLD);
             //// send phase fields
             MPI_Send(&phi[0][0][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&phi[0][1][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&phi[0][2][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
-            MPI_Send(&u[0][offset], rows * NY, MPI_FLOAT, dest, BEGIN,
-                     MPI_COMM_WORLD);
+            //// send concentration fields
+            MPI_Send(&con0[offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&con1[offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&con2[offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&con[0][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+
             offset = offset + rows;
         }
         // Receive from workers
@@ -198,33 +209,57 @@ int main(int argc, char *argv[])
             MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&u[0][offset], rows * NY, MPI_FLOAT, source,
                      msgtype, MPI_COMM_WORLD, &status);
+            //// receive phase fields
             MPI_Recv(&phi[0][0][offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&phi[0][1][offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&phi[0][2][offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
+            //// receive con fields
+            MPI_Recv(&con0[offset], rows * NY, MPI_DOUBLE, source,
+                     msgtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&con1[offset], rows * NY, MPI_DOUBLE, source,
+                     msgtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&con2[offset], rows * NY, MPI_DOUBLE, source,
+                     msgtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&con[0][offset], rows * NY, MPI_DOUBLE, source,
+                     msgtype, MPI_COMM_WORLD, &status);
         }
         prtdat(NX, NY, u, "final.dat");
-        savedata(NX, NY, phi, "phi.dat");
+        savedata(NX, NY, &phi[0][1], "phi.dat");
+        savedata(NX, NY, con, "con.dat");
+
         MPI_Finalize();
     }
 
     /************************* workers code **********************************/
     if (taskid != MASTER)
     {
+        float u[2][rows + 2][NY];
+        double
+            con[2][rows + 2][NY],
+            con1[rows + 2][NY],
+            con2[rows + 2][NY],
+            con0[rows + 2][NY];
+
+        double phi[2][N][rows + 2][NY];
         // Initialize with zero
-        for (iz = 0; iz < 2; iz++)
+        for (ix = 0; ix < rows + 2; ix++)
         {
-            for (ix = 0; ix < NX; ix++)
+            for (iy = 0; iy < NY; iy++)
             {
-                for (iy = 0; iy < NY; iy++)
+                for (iz = 0; iz < 2; iz++)
                 {
                     u[iz][ix][iy] = 0.0;
                     phi[iz][0][ix][iy] = 0.0;
                     phi[iz][1][ix][iy] = 0.0;
                     phi[iz][2][ix][iy] = 0.0;
+                    con[iz][ix][iy] = 0.0;
                 }
+                con0[ix][iy] = 0.0;
+                con1[ix][iy] = 0.0;
+                con2[ix][iy] = 0.0;
             }
         }
 
@@ -235,12 +270,18 @@ int main(int argc, char *argv[])
         MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&up, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&down, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-        //// receive phase fields
-        MPI_Recv(&phi[0][0][offset], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&phi[0][1][offset], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&phi[0][2][offset], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&u[0][offset], rows * NY, MPI_FLOAT, source, msgtype,
+
+        MPI_Recv(&u[0][1], rows * NY, MPI_FLOAT, source, msgtype,
                  MPI_COMM_WORLD, &status);
+        //// receive phase fields
+        MPI_Recv(&phi[0][0][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&phi[0][1][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&phi[0][2][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        //// receive con fields
+        MPI_Recv(&con0[1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&con1[1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&con2[1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&con[0][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
 
         iz = 0;
         for (it = 1; it <= STEPS; it++)
@@ -248,71 +289,119 @@ int main(int argc, char *argv[])
             // Communicate with neighor works before computation
             if (up != NONE)
             {
-                MPI_Send(&u[iz][offset], NY, MPI_FLOAT, up,
+                MPI_Send(&u[iz][1], NY, MPI_FLOAT, up,
                          DTAG, MPI_COMM_WORLD);
                 //// send up boundaries of phase fields
-                MPI_Send(&phi[iz][0][offset], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][1][offset], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][2][offset], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][0][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][1][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][2][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                //// send up boundaries of con fields
+                MPI_Send(&con0[1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&con1[1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&con2[1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&con[iz][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
 
                 source = up;
                 msgtype = UTAG;
-                MPI_Recv(&u[iz][offset - 1], NY, MPI_FLOAT, source,
+                MPI_Recv(&u[iz][0], NY, MPI_FLOAT, source,
                          msgtype, MPI_COMM_WORLD, &status);
                 //// receive up boundaries of phase fields
-                MPI_Recv(&phi[iz][0][offset - 1], NY, MPI_DOUBLE, source,
+                MPI_Recv(&phi[iz][0][0], NY, MPI_DOUBLE, source,
                          msgtype, MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][1][offset - 1], NY, MPI_DOUBLE, source,
+                MPI_Recv(&phi[iz][1][0], NY, MPI_DOUBLE, source,
                          msgtype, MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][2][offset - 1], NY, MPI_DOUBLE, source,
+                MPI_Recv(&phi[iz][2][0], NY, MPI_DOUBLE, source,
+                         msgtype, MPI_COMM_WORLD, &status);
+                //// receive up boundaries of con fields
+                MPI_Recv(&con0[0], NY, MPI_DOUBLE, source,
+                         msgtype, MPI_COMM_WORLD, &status);
+                MPI_Recv(&con1[0], NY, MPI_DOUBLE, source,
+                         msgtype, MPI_COMM_WORLD, &status);
+                MPI_Recv(&con2[0], NY, MPI_DOUBLE, source,
+                         msgtype, MPI_COMM_WORLD, &status);
+                MPI_Recv(&con[iz][0], NY, MPI_DOUBLE, source,
                          msgtype, MPI_COMM_WORLD, &status);
             }
             if (down != NONE)
             {
-                MPI_Send(&u[iz][offset + rows - 1], NY, MPI_FLOAT, down,
+                MPI_Send(&u[iz][rows], NY, MPI_FLOAT, down,
                          UTAG, MPI_COMM_WORLD);
                 //// send down boundaries of phase fields
-                MPI_Send(&phi[iz][0][offset + rows - 1], NY, MPI_DOUBLE, down,
+                MPI_Send(&phi[iz][0][rows], NY, MPI_DOUBLE, down,
                          UTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][1][offset + rows - 1], NY, MPI_DOUBLE, down,
+                MPI_Send(&phi[iz][1][rows], NY, MPI_DOUBLE, down,
                          UTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][2][offset + rows - 1], NY, MPI_DOUBLE, down,
+                MPI_Send(&phi[iz][2][rows], NY, MPI_DOUBLE, down,
+                         UTAG, MPI_COMM_WORLD);
+                //// send down boundaries of con fields
+                MPI_Send(&con0[rows], NY, MPI_DOUBLE, down,
+                         UTAG, MPI_COMM_WORLD);
+                MPI_Send(&con1[rows], NY, MPI_DOUBLE, down,
+                         UTAG, MPI_COMM_WORLD);
+                MPI_Send(&con2[rows], NY, MPI_DOUBLE, down,
+                         UTAG, MPI_COMM_WORLD);
+                MPI_Send(&con[iz][rows], NY, MPI_DOUBLE, down,
                          UTAG, MPI_COMM_WORLD);
 
                 source = down;
                 msgtype = DTAG;
-                MPI_Recv(&u[iz][offset + rows], NY, MPI_FLOAT, source, msgtype,
+                MPI_Recv(&u[iz][rows + 1], NY, MPI_FLOAT, source, msgtype,
                          MPI_COMM_WORLD, &status);
                 //// receive down boundaries of phase fields
-                MPI_Recv(&phi[iz][0][offset + rows], NY, MPI_DOUBLE, source, msgtype,
+                MPI_Recv(&phi[iz][0][rows + 1], NY, MPI_DOUBLE, source, msgtype,
                          MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][1][offset + rows], NY, MPI_DOUBLE, source, msgtype,
+                MPI_Recv(&phi[iz][1][rows + 1], NY, MPI_DOUBLE, source, msgtype,
                          MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][2][offset + rows], NY, MPI_DOUBLE, source, msgtype,
+                MPI_Recv(&phi[iz][2][rows + 1], NY, MPI_DOUBLE, source, msgtype,
+                         MPI_COMM_WORLD, &status);
+                //// receive down boundaries of con fields
+                MPI_Recv(&con0[rows + 1], NY, MPI_DOUBLE, source, msgtype,
+                         MPI_COMM_WORLD, &status);
+                MPI_Recv(&con1[rows + 1], NY, MPI_DOUBLE, source, msgtype,
+                         MPI_COMM_WORLD, &status);
+                MPI_Recv(&con2[rows + 1], NY, MPI_DOUBLE, source, msgtype,
+                         MPI_COMM_WORLD, &status);
+                MPI_Recv(&con[iz][rows + 1], NY, MPI_DOUBLE, source, msgtype,
                          MPI_COMM_WORLD, &status);
             }
 
             // Compute after sending and receiving data
-            start = offset;
-            end = offset + rows - 1;
-            if (offset == 0)
-                start = 1;
-            if ((offset + rows) == NX)
+            start = 1;
+            end = rows;
+            if (up == NONE)
+                start = 2;
+            if (down == NONE)
                 end--;
             update(start, end, NY, &u[iz], &u[1 - iz]);
+
+            compute(start, end, NX, NY,
+                    nm, phiNum, phiIdx,
+                    &phi[iz], &phi[1 - iz],
+                    con0, con1, con2, &con[iz], &con[1 - iz]);
+
             iz = 1 - iz;
         }
 
         // Send final result to master
         MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-        MPI_Send(&u[iz][offset], rows * NY, MPI_FLOAT, MASTER, DONE,
+        MPI_Send(&u[iz][1], rows * NY, MPI_FLOAT, MASTER, DONE,
                  MPI_COMM_WORLD);
-        MPI_Send(&phi[iz][0][offset], rows * NY, MPI_DOUBLE, MASTER, DONE,
+        //// send phase fields
+        MPI_Send(&phi[iz][0][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
                  MPI_COMM_WORLD);
-        MPI_Send(&phi[iz][1][offset], rows * NY, MPI_DOUBLE, MASTER, DONE,
+        MPI_Send(&phi[iz][1][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
                  MPI_COMM_WORLD);
-        MPI_Send(&phi[iz][2][offset], rows * NY, MPI_DOUBLE, MASTER, DONE,
+        MPI_Send(&phi[iz][2][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
+                 MPI_COMM_WORLD);
+        //// send con fields
+        MPI_Send(&con0[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
+                 MPI_COMM_WORLD);
+        MPI_Send(&con1[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
+                 MPI_COMM_WORLD);
+        MPI_Send(&con2[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
+                 MPI_COMM_WORLD);
+        MPI_Send(&con[iz][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
                  MPI_COMM_WORLD);
         MPI_Finalize();
     }
@@ -332,7 +421,9 @@ void update(int start, int end, int ny, float *u1, float *u2)
                                                2.0 * *(u1 + ix * ny + iy));
 }
 
-void initialize(int nx, int ny, double *phi0, double *phi1, double *phi2, double *con0, double *con1, double *con2, double *con)
+void initialize(int nx, int ny,
+                double *phi0, double *phi1, double *phi2,
+                double *con0, double *con1, double *con2, double *con)
 {
     int ix, iy;
     double sum1 = 0.0;
@@ -360,6 +451,37 @@ void initialize(int nx, int ny, double *phi0, double *phi1, double *phi2, double
                 *(con0 + ix * ny + iy) = 0.2;
             }
             *(con + ix * ny + iy) = *(phi1 + ix * ny + iy) * *(con1 + ix * ny + iy) + *(phi2 + ix * ny + iy) * *(con2 + ix * ny + iy) + *(phi0 + ix * ny + iy) * *(con0 + ix * ny + iy);
+        }
+    }
+}
+
+void compute(int start, int end, int nx, int ny,
+             int nm, double *phiNum, double *phiIdx,
+             double *phio, double *phin,
+             double *con0, double *con1, double *con2,
+             double *cono, double *conn)
+{
+    int ix, iy, ixp, ixm, iyp, iym,
+        phinum, ii;
+
+    for (ix = start; ix <= end; ix++)
+    {
+        for (iy = 1; iy <= ny - 2; iy++)
+        {
+            phinum = 0;
+            for (ii = 0; ii <= nm; ii++)
+            {
+                if ((*(phio + ii * nx * ny + ix * ny + iy) > 0.0) ||
+                    ((*(phio + ii * nx * ny + ix * ny + iy) == 0.0) && (*(phio + ii * nx * ny + (ix + 1) * ny + iy) > 0.0) ||
+                     (*(phio + ii * nx * ny + (ix - 1) * ny + iy) > 0.0) ||
+                     (*(phio + ii * nx * ny + ix * ny + iy + 1) > 0.0) ||
+                     (*(phio + ii * nx * ny + ix * ny + iy - 1) > 0.0)))
+                {
+                    phinum++;
+                    *(phiIdx + phinum * nx * ny + ix * ny + iy) = ii;
+                }
+            }
+            *(phiNum + ix * ny + iy) = phinum;
         }
     }
 }
