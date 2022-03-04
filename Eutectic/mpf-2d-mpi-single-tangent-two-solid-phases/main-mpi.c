@@ -8,7 +8,7 @@
 #define NX 100
 #define NY 100
 #define PI 3.14159
-#define STEPS 100
+#define STEPS 10000
 #define BEGIN 1
 #define UTAG 2
 #define DTAG 3
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 
         initialize(NX, NY, &phi[0][0], &phi[0][1], &phi[0][2], con0, con1, con2, con);
         inidat(NX, NY, &u[0]);
-        savedata(NX, NY, &phi[0][1], "initial.dat");
+        savedata(NX, NY, &phi[0][0], "initial.dat");
 
         rows = NX / numworkers;
         offset = 0;
@@ -180,11 +180,12 @@ int main(int argc, char *argv[])
             MPI_Send(&rows, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&up, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&down, 1, MPI_INT, dest, BEGIN, MPI_COMM_WORLD);
-            MPI_Send(&u[0][offset][0], rows * NY, MPI_FLOAT, dest, BEGIN,
+            MPI_Send(&phi[0][0][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&u[0][offset], rows * NY, MPI_FLOAT, dest, BEGIN,
                      MPI_COMM_WORLD);
             offset = offset + rows;
         }
-        // Receive from works
+        // Receive from workers
         for (i = 1; i <= numworkers; i++)
         {
             source = i;
@@ -205,9 +206,18 @@ int main(int argc, char *argv[])
     {
         // Initialize with zero
         for (iz = 0; iz < 2; iz++)
+        {
             for (ix = 0; ix < NX; ix++)
+            {
                 for (iy = 0; iy < NY; iy++)
+                {
                     u[iz][ix][iy] = 0.0;
+                    phi[iz][0][ix][iy] = 0.0;
+                    phi[iz][1][ix][iy] = 0.0;
+                    phi[iz][2][ix][iy] = 0.0;
+                }
+            }
+        }
 
         // Receive from master
         source = MASTER;
@@ -216,7 +226,8 @@ int main(int argc, char *argv[])
         MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&up, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&down, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&u[0][offset][0], rows * NY, MPI_FLOAT, source, msgtype,
+        MPI_Recv(&phi[0][0][offset], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&u[0][offset], rows * NY, MPI_FLOAT, source, msgtype,
                  MPI_COMM_WORLD, &status);
 
         iz = 0;
@@ -225,20 +236,27 @@ int main(int argc, char *argv[])
             // Communicate with neighor works before computation
             if (up != NONE)
             {
-                MPI_Send(&u[iz][offset][0], NY, MPI_FLOAT, up,
+                MPI_Send(&u[iz][offset], NY, MPI_FLOAT, up,
                          DTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][0][offset], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
                 source = up;
                 msgtype = UTAG;
-                MPI_Recv(&u[iz][offset - 1][0], NY, MPI_FLOAT, source,
+                MPI_Recv(&u[iz][offset - 1], NY, MPI_FLOAT, source,
+                         msgtype, MPI_COMM_WORLD, &status);
+                MPI_Recv(&phi[iz][0][offset - 1], NY, MPI_DOUBLE, source,
                          msgtype, MPI_COMM_WORLD, &status);
             }
             if (down != NONE)
             {
-                MPI_Send(&u[iz][offset + rows - 1][0], NY, MPI_FLOAT, down,
+                MPI_Send(&u[iz][offset + rows - 1], NY, MPI_FLOAT, down,
+                         UTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][0][offset + rows - 1], NY, MPI_DOUBLE, down,
                          UTAG, MPI_COMM_WORLD);
                 source = down;
                 msgtype = DTAG;
-                MPI_Recv(&u[iz][offset + rows][0], NY, MPI_FLOAT, source, msgtype,
+                MPI_Recv(&u[iz][offset + rows], NY, MPI_FLOAT, source, msgtype,
+                         MPI_COMM_WORLD, &status);
+                MPI_Recv(&phi[iz][0][offset + rows], NY, MPI_DOUBLE, source, msgtype,
                          MPI_COMM_WORLD, &status);
             }
 
@@ -249,14 +267,14 @@ int main(int argc, char *argv[])
                 start = 1;
             if ((offset + rows) == NX)
                 end--;
-            update(start, end, NY, &u[iz][0][0], &u[1 - iz][0][0]);
+            update(start, end, NY, &u[iz], &u[1 - iz]);
             iz = 1 - iz;
         }
 
         // Send final result to master
         MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
-        MPI_Send(&u[iz][offset][0], rows * NY, MPI_FLOAT, MASTER, DONE,
+        MPI_Send(&u[iz][offset], rows * NY, MPI_FLOAT, MASTER, DONE,
                  MPI_COMM_WORLD);
         MPI_Finalize();
     }
