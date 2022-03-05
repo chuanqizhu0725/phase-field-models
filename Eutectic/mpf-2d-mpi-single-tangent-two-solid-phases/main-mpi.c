@@ -8,7 +8,7 @@
 #define NX 100
 #define NY 100
 #define PI 3.14159
-#define STEPS 10000
+#define STEPS 100
 #define BEGIN 1
 #define UTAG 2
 #define DTAG 3
@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
         initialize(),
         compute(),
         savedata(),
+        saveint(),
         update(),
         prtdat();
 
@@ -71,32 +72,35 @@ int main(int argc, char *argv[])
     double c2e = c02e * kap2;
 
     double mij[N][N], aij[N][N], wij[N][N], fij[N][N], thij[N][N];
-    // bool anij[N][N];
+    int aniso[N][N];
 
-    // int i, j;
+    int i, j, im, ip, jm, jp, k;
+    int ii, jj, kk;
+    int n1, n2, n3;
+    int istep;
 
-    // for (i = 0; i <= nm; i++)
-    // {
-    //     for (j = 0; j <= nm; j++)
-    //     {
-    //         wij[i][j] = W0;
-    //         aij[i][j] = A0;
-    //         mij[i][j] = M0;
-    //         anij[i][j] = false;
-    //         thij[i][j] = 0.0;
-    //         if ((i == 0) || (j == 0))
-    //         {
-    //             anij[i][j] = true;
-    //         }
-    //         if (i == j)
-    //         {
-    //             wij[i][j] = 0.0;
-    //             aij[i][j] = 0.0;
-    //             mij[i][j] = 0.0;
-    //             anij[i][j] = false;
-    //         }
-    //     }
-    // }
+    for (i = 0; i <= nm; i++)
+    {
+        for (j = 0; j <= nm; j++)
+        {
+            wij[i][j] = W0;
+            aij[i][j] = A0;
+            mij[i][j] = M0;
+            aniso[i][j] = 0;
+            thij[i][j] = 0.0;
+            if ((i == 0) || (j == 0))
+            {
+                aniso[i][j] = 1;
+            }
+            if (i == j)
+            {
+                wij[i][j] = 0.0;
+                aij[i][j] = 0.0;
+                mij[i][j] = 0.0;
+                aniso[i][j] = 0;
+            }
+        }
+    }
 
     double c0, dc0;
 
@@ -107,13 +111,6 @@ int main(int argc, char *argv[])
     double phis_ij, phis_ipj, phis_imj, phis_ijp, phis_ijm;
     double cons_ij, cons_ipj, cons_imj, cons_ijp, cons_ijm;
 
-    int i, j, im, ip, jm, jp, k;
-    int ii, jj, kk;
-    int n1, n2, n3;
-    int istep;
-
-    double pddtt, sum1;
-
     double theta, theta0;
     double epsilon0;
     double termiikk, termjjkk;
@@ -122,9 +119,6 @@ int main(int argc, char *argv[])
     double ep, ep1p, ep2p;
 
     double dF;
-
-    int phiNum[NX][NY];
-    int phiIdx[N + 1][NX][NY];
 
     int taskid,
         numworkers,
@@ -160,12 +154,15 @@ int main(int argc, char *argv[])
             con2[NX][NY],
             con0[NX][NY];
 
-        double phi[2][N][NX][NY];
+        double phi[2][NX][NY][N];
 
-        initialize(NX, NY, &phi[0][0], &phi[0][1], &phi[0][2], con0, con1, con2, con);
+        int phiNum[NY][NY];
+
+        initialize(NX, NY, &phi[0], con0, con1, con2, con);
+        savedata(NX, NY, &phi[0], 2, "initial.dat");
+
         float u[2][NX][NY];
-        inidat(NX, NY, &u);
-        savedata(NX, NY, &phi[0][0], "initial.dat");
+        inidat(NX, NY, u);
 
         offset = 0;
         // Send to workers
@@ -188,9 +185,7 @@ int main(int argc, char *argv[])
             MPI_Send(&u[0][offset], rows * NY, MPI_FLOAT, dest, BEGIN,
                      MPI_COMM_WORLD);
             //// send phase fields
-            MPI_Send(&phi[0][0][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
-            MPI_Send(&phi[0][1][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
-            MPI_Send(&phi[0][2][offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
+            MPI_Send(&phi[0][offset], rows * NY * N, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
             //// send concentration fields
             MPI_Send(&con0[offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
             MPI_Send(&con1[offset], rows * NY, MPI_DOUBLE, dest, BEGIN, MPI_COMM_WORLD);
@@ -209,12 +204,10 @@ int main(int argc, char *argv[])
             MPI_Recv(&rows, 1, MPI_INT, source, msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&u[0][offset], rows * NY, MPI_FLOAT, source,
                      msgtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&phiNum[offset], rows * NY, MPI_INT, source,
+                     msgtype, MPI_COMM_WORLD, &status);
             //// receive phase fields
-            MPI_Recv(&phi[0][0][offset], rows * NY, MPI_DOUBLE, source,
-                     msgtype, MPI_COMM_WORLD, &status);
-            MPI_Recv(&phi[0][1][offset], rows * NY, MPI_DOUBLE, source,
-                     msgtype, MPI_COMM_WORLD, &status);
-            MPI_Recv(&phi[0][2][offset], rows * NY, MPI_DOUBLE, source,
+            MPI_Recv(&phi[1][offset], rows * NY * N, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
             //// receive con fields
             MPI_Recv(&con0[offset], rows * NY, MPI_DOUBLE, source,
@@ -223,12 +216,12 @@ int main(int argc, char *argv[])
                      msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&con2[offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
-            MPI_Recv(&con[0][offset], rows * NY, MPI_DOUBLE, source,
+            MPI_Recv(&con[1][offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
         }
         prtdat(NX, NY, u, "final.dat");
-        savedata(NX, NY, &phi[0][1], "phi.dat");
-        savedata(NX, NY, con, "con.dat");
+        // savedata(NX, NY, &phi[1], "phi.dat");
+        // saveint(NX, NY, phiNum, "phinum.dat");
 
         MPI_Finalize();
     }
@@ -243,7 +236,10 @@ int main(int argc, char *argv[])
             con2[rows + 2][NY],
             con0[rows + 2][NY];
 
-        double phi[2][N][rows + 2][NY];
+        double phi[2][rows + 2][NY][N];
+
+        int phiNum[rows + 2][NY];
+        int phiIdx[N + 1][rows + 2][NY];
         // Initialize with zero
         for (ix = 0; ix < rows + 2; ix++)
         {
@@ -252,9 +248,9 @@ int main(int argc, char *argv[])
                 for (iz = 0; iz < 2; iz++)
                 {
                     u[iz][ix][iy] = 0.0;
-                    phi[iz][0][ix][iy] = 0.0;
-                    phi[iz][1][ix][iy] = 0.0;
-                    phi[iz][2][ix][iy] = 0.0;
+                    phi[iz][ix][iy][0] = 0.0;
+                    phi[iz][ix][iy][1] = 0.0;
+                    phi[iz][ix][iy][2] = 0.0;
                     con[iz][ix][iy] = 0.0;
                 }
                 con0[ix][iy] = 0.0;
@@ -274,9 +270,7 @@ int main(int argc, char *argv[])
         MPI_Recv(&u[0][1], rows * NY, MPI_FLOAT, source, msgtype,
                  MPI_COMM_WORLD, &status);
         //// receive phase fields
-        MPI_Recv(&phi[0][0][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&phi[0][1][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&phi[0][2][1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&phi[0][1], rows * NY * N, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
         //// receive con fields
         MPI_Recv(&con0[1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&con1[1], rows * NY, MPI_DOUBLE, source, msgtype, MPI_COMM_WORLD, &status);
@@ -292,9 +286,7 @@ int main(int argc, char *argv[])
                 MPI_Send(&u[iz][1], NY, MPI_FLOAT, up,
                          DTAG, MPI_COMM_WORLD);
                 //// send up boundaries of phase fields
-                MPI_Send(&phi[iz][0][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][1][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][2][1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
+                MPI_Send(&phi[iz][1], NY * N, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
                 //// send up boundaries of con fields
                 MPI_Send(&con0[1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
                 MPI_Send(&con1[1], NY, MPI_DOUBLE, up, DTAG, MPI_COMM_WORLD);
@@ -306,11 +298,7 @@ int main(int argc, char *argv[])
                 MPI_Recv(&u[iz][0], NY, MPI_FLOAT, source,
                          msgtype, MPI_COMM_WORLD, &status);
                 //// receive up boundaries of phase fields
-                MPI_Recv(&phi[iz][0][0], NY, MPI_DOUBLE, source,
-                         msgtype, MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][1][0], NY, MPI_DOUBLE, source,
-                         msgtype, MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][2][0], NY, MPI_DOUBLE, source,
+                MPI_Recv(&phi[iz][0], NY * N, MPI_DOUBLE, source,
                          msgtype, MPI_COMM_WORLD, &status);
                 //// receive up boundaries of con fields
                 MPI_Recv(&con0[0], NY, MPI_DOUBLE, source,
@@ -327,11 +315,7 @@ int main(int argc, char *argv[])
                 MPI_Send(&u[iz][rows], NY, MPI_FLOAT, down,
                          UTAG, MPI_COMM_WORLD);
                 //// send down boundaries of phase fields
-                MPI_Send(&phi[iz][0][rows], NY, MPI_DOUBLE, down,
-                         UTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][1][rows], NY, MPI_DOUBLE, down,
-                         UTAG, MPI_COMM_WORLD);
-                MPI_Send(&phi[iz][2][rows], NY, MPI_DOUBLE, down,
+                MPI_Send(&phi[iz][rows], NY * N, MPI_DOUBLE, down,
                          UTAG, MPI_COMM_WORLD);
                 //// send down boundaries of con fields
                 MPI_Send(&con0[rows], NY, MPI_DOUBLE, down,
@@ -348,11 +332,7 @@ int main(int argc, char *argv[])
                 MPI_Recv(&u[iz][rows + 1], NY, MPI_FLOAT, source, msgtype,
                          MPI_COMM_WORLD, &status);
                 //// receive down boundaries of phase fields
-                MPI_Recv(&phi[iz][0][rows + 1], NY, MPI_DOUBLE, source, msgtype,
-                         MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][1][rows + 1], NY, MPI_DOUBLE, source, msgtype,
-                         MPI_COMM_WORLD, &status);
-                MPI_Recv(&phi[iz][2][rows + 1], NY, MPI_DOUBLE, source, msgtype,
+                MPI_Recv(&phi[iz][rows + 1], NY * N, MPI_DOUBLE, source, msgtype,
                          MPI_COMM_WORLD, &status);
                 //// receive down boundaries of con fields
                 MPI_Recv(&con0[rows + 1], NY, MPI_DOUBLE, source, msgtype,
@@ -374,10 +354,11 @@ int main(int argc, char *argv[])
                 end--;
             update(start, end, NY, &u[iz], &u[1 - iz]);
 
-            compute(start, end, NX, NY,
-                    nm, phiNum, phiIdx,
-                    &phi[iz], &phi[1 - iz],
-                    con0, con1, con2, &con[iz], &con[1 - iz]);
+            // compute(start, end, NX, NY,
+            //         nm, phiNum, phiIdx,
+            //         &phi[iz], &phi[1 - iz],
+            //         aij, wij, mij,
+            //         dx, dtime);
 
             iz = 1 - iz;
         }
@@ -387,12 +368,10 @@ int main(int argc, char *argv[])
         MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&u[iz][1], rows * NY, MPI_FLOAT, MASTER, DONE,
                  MPI_COMM_WORLD);
+        MPI_Send(&phiNum[1], rows * NY, MPI_INT, MASTER, DONE,
+                 MPI_COMM_WORLD);
         //// send phase fields
-        MPI_Send(&phi[iz][0][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
-                 MPI_COMM_WORLD);
-        MPI_Send(&phi[iz][1][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
-                 MPI_COMM_WORLD);
-        MPI_Send(&phi[iz][2][1], rows * NY, MPI_DOUBLE, MASTER, DONE,
+        MPI_Send(&phi[iz][1], rows * NY * N, MPI_DOUBLE, MASTER, DONE,
                  MPI_COMM_WORLD);
         //// send con fields
         MPI_Send(&con0[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
@@ -422,7 +401,7 @@ void update(int start, int end, int ny, float *u1, float *u2)
 }
 
 void initialize(int nx, int ny,
-                double *phi0, double *phi1, double *phi2,
+                double *phi,
                 double *con0, double *con1, double *con2, double *con)
 {
     int ix, iy;
@@ -434,59 +413,28 @@ void initialize(int nx, int ny,
         {
             if ((ix - nx / 2) * (ix - nx / 2) + (iy - ny / 2) * (iy - ny / 2) < 400)
             {
-                *(phi1 + ix * ny + iy) = 1.0;
+                *(phi + nx * ny + ix * ny + iy) = 1.0;
                 *(con1 + ix * ny + iy) = 0.1;
-                *(phi2 + ix * ny + iy) = 0.0;
+                *(phi + nx * ny * 2 + ix * ny + iy) = 0.0;
                 *(con2 + ix * ny + iy) = 0.8;
-                *(phi0 + ix * ny + iy) = 0.0;
+                *(phi + ix * ny + iy) = 0.0;
                 *(con0 + ix * ny + iy) = 0.3;
             }
             else
             {
-                *(phi1 + ix * ny + iy) = 0.0;
+                *(phi + nx * ny + ix * ny + iy + 1) = 0.0;
                 *(con1 + ix * ny + iy) = 0.1;
-                *(phi2 + ix * ny + iy) = 0.0;
+                *(phi + nx * ny * 2 + ix * ny + iy) = 0.0;
                 *(con2 + ix * ny + iy) = 0.8;
-                *(phi0 + ix * ny + iy) = 1.0;
+                *(phi + ix * ny + iy) = 1.0;
                 *(con0 + ix * ny + iy) = 0.2;
             }
-            *(con + ix * ny + iy) = *(phi1 + ix * ny + iy) * *(con1 + ix * ny + iy) + *(phi2 + ix * ny + iy) * *(con2 + ix * ny + iy) + *(phi0 + ix * ny + iy) * *(con0 + ix * ny + iy);
+            *(con + ix * ny + iy) = *(phi + ix * ny + iy + 1) * *(con1 + ix * ny + iy) + *(phi + ix * ny + iy + 2) * *(con2 + ix * ny + iy) + *(phi + ix * ny + iy) * *(con0 + ix * ny + iy);
         }
     }
 }
 
-void compute(int start, int end, int nx, int ny,
-             int nm, double *phiNum, double *phiIdx,
-             double *phio, double *phin,
-             double *con0, double *con1, double *con2,
-             double *cono, double *conn)
-{
-    int ix, iy, ixp, ixm, iyp, iym,
-        phinum, ii;
-
-    for (ix = start; ix <= end; ix++)
-    {
-        for (iy = 1; iy <= ny - 2; iy++)
-        {
-            phinum = 0;
-            for (ii = 0; ii <= nm; ii++)
-            {
-                if ((*(phio + ii * nx * ny + ix * ny + iy) > 0.0) ||
-                    ((*(phio + ii * nx * ny + ix * ny + iy) == 0.0) && (*(phio + ii * nx * ny + (ix + 1) * ny + iy) > 0.0) ||
-                     (*(phio + ii * nx * ny + (ix - 1) * ny + iy) > 0.0) ||
-                     (*(phio + ii * nx * ny + ix * ny + iy + 1) > 0.0) ||
-                     (*(phio + ii * nx * ny + ix * ny + iy - 1) > 0.0)))
-                {
-                    phinum++;
-                    *(phiIdx + phinum * nx * ny + ix * ny + iy) = ii;
-                }
-            }
-            *(phiNum + ix * ny + iy) = phinum;
-        }
-    }
-}
-
-void savedata(int nx, int ny, double *data, char *fnam)
+void savedata(int nx, int ny, double *data, int p, char *fnam)
 {
     int ix, iy;
     FILE *fp;
@@ -496,7 +444,110 @@ void savedata(int nx, int ny, double *data, char *fnam)
     {
         for (iy = 0; iy <= ny - 1; iy++)
         {
-            fprintf(fp, "%e", *(data + ix * ny + iy));
+            fprintf(fp, "%e", *(data + ix * ny + iy + p * nx * ny));
+            fprintf(fp, "\n");
+        }
+    }
+    fclose(fp);
+}
+
+// void compute(int start, int end, int nx, int ny,
+//              int nm, int *phiNum, int *phiIdx,
+//              double *phio, double *phin,
+//              double *aij, double *wij, double *mij,
+//              double dx, double dtime)
+// {
+//     // Collect local info of phase fields
+//     int ix, iy,
+//         phinum, ii, jj, kk;
+
+//     for (ix = start; ix <= end; ix++)
+//     {
+//         for (iy = 1; iy <= ny - 2; iy++)
+//         {
+//             phinum = 0;
+//             for (ii = 0; ii <= nm; ii++)
+//             {
+//                 if ((*(phio + ii * nx * ny + ix * ny + iy) > 0.0) ||
+//                     ((*(phio + ii * nx * ny + ix * ny + iy) == 0.0) && (*(phio + ii * nx * ny + (ix + 1) * ny + iy) > 0.0) ||
+//                      (*(phio + ii * nx * ny + (ix - 1) * ny + iy) > 0.0) ||
+//                      (*(phio + ii * nx * ny + ix * ny + iy + 1) > 0.0) ||
+//                      (*(phio + ii * nx * ny + ix * ny + iy - 1) > 0.0)))
+//                 {
+//                     phinum++;
+//                     *(phiIdx + phinum * nx * ny + ix * ny + iy) = ii;
+//                 }
+//             }
+//             *(phiNum + ix * ny + iy) = phinum;
+//         }
+//     }
+
+// int n1, n2, n3;
+// double dpdt, sum, termiikk, termjjkk;
+// double dF;
+
+// for (ix = start; ix <= end; ix++)
+// {
+//     for (iy = 1; iy <= ny - 2; iy++)
+//     {
+
+//         for (n1 = 1; n1 <= *(phiNum + ix * ny + iy); n1++)
+//         {
+//             ii = *(phiIdx + n1 * nx * ny + ix * ny + iy);
+//             dpdt = 0.0;
+//             for (n2 = 1; n2 <= *(phiNum + ix * ny + iy); n2++)
+//             {
+//                 jj = *(phiIdx + n2 * nx * ny + ix * ny + iy);
+//                 sum = 0.0;
+//                 for (n3 = 1; n3 <= *(phiNum + ix * ny + iy); n3++)
+//                 {
+//                     kk = *(phiIdx + n3 * nx * ny + ix * ny + iy);
+
+//                     termiikk = *(aij + ii * (nm + 1) + kk) * (*(phio + kk * nx * ny + (ix + 1) * ny + iy) + *(phio + kk * nx * ny + (ix - 1) * ny + iy) + *(phio + kk * nx * ny + ix * ny + iy + 1) + *(phio + kk * nx * ny + ix * ny + iy - 1) - 4.0 * *(phio + kk * nx * ny + ix * ny + iy)) / (dx * dx);
+
+//                     termjjkk = *(aij + jj * (nm + 1) + kk) * (*(phio + kk * nx * ny + (ix + 1) * ny + iy) + *(phio + kk * nx * ny + (ix - 1) * ny + iy) + *(phio + kk * nx * ny + ix * ny + iy + 1) + *(phio + kk * nx * ny + ix * ny + iy - 1) - 4.0 * *(phio + kk * nx * ny + ix * ny + iy)) / (dx * dx);
+
+//                     sum += 0.5 * (termiikk - termjjkk) + (*(wij + ii * (nm + 1) + kk) - *(wij + jj * (nm + 1) + kk)) * *(phio + kk * nx * ny + ix * ny + iy);
+//                 }
+//                 if (ii == 1 && jj == 0)
+//                 {
+//                     dF = 2.0e6;
+//                 }
+//                 else if (ii == 0 && jj == 1)
+//                 {
+//                     dF = -2.0e6;
+//                 }
+//                 else
+//                 {
+//                     dF = 0.0;
+//                 }
+//                 dpdt += -2.0 * (*(mij + ii * (nm + 1) + jj) / (double)*(phiNum + ix * ny + iy)) * (sum - 8.0 / PI * dF * sqrt(*(phio + ii * nx * ny + ix * ny + iy) * *(phio + jj * nx * ny + ix * ny + iy)));
+//             }
+//             *(phin + ii * nx * ny + ix * ny + iy) = *(phio + ii * nx * ny + ix * ny + iy) + dpdt * dtime;
+//             if (*(phin + ii * nx * ny + ix * ny + iy) >= 1.0)
+//             {
+//                 *(phin + ii * nx * ny + ix * ny + iy) = 1.0;
+//             }
+//             if (*(phin + ii * nx * ny + ix * ny + iy) <= 0.0)
+//             {
+//                 *(phin + ii * nx * ny + ix * ny + iy) = 0.0;
+//             }
+//         }
+//     }
+// }
+// }
+
+void saveint(int nx, int ny, int *data, char *fnam)
+{
+    int ix, iy;
+    FILE *fp;
+
+    fp = fopen(fnam, "w");
+    for (ix = 0; ix <= nx - 1; ix++)
+    {
+        for (iy = 0; iy <= ny - 1; iy++)
+        {
+            fprintf(fp, "%d", *(data + ix * ny + iy));
             fprintf(fp, "\n");
         }
     }
