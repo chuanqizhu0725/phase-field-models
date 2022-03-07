@@ -7,7 +7,6 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include "mpi.h"
 
 using namespace std;
 
@@ -19,8 +18,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 50001;
-int pstep = 500;
+int nstep = 1;
+int pstep = 1;
 
 double dx = 1.0e-8;
 double dtime = 4.0e-12;
@@ -135,8 +134,8 @@ int main(void)
     {
         for (j = 0; j <= ndm; j++)
         {
-            if (i <= ND / 8 && j < ND / 2)
-            // if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 25)
+            // if (i <= ND / 8 && j < ND / 2)
+            if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 400)
             {
                 phi[1][i][j] = 1.0;
                 con1[i][j] = c1e;
@@ -145,15 +144,15 @@ int main(void)
                 phi[0][i][j] = 0.0;
                 con0[i][j] = c01e;
             }
-            else if (i <= ND / 8 && j >= ND / 2)
-            {
-                phi[2][i][j] = 1.0;
-                con2[i][j] = c2e;
-                phi[1][i][j] = 0.0;
-                con1[i][j] = c1e;
-                phi[0][i][j] = 0.0;
-                con0[i][j] = c02e;
-            }
+            // else if (i <= ND / 8 && j >= ND / 2)
+            // {
+            //     phi[2][i][j] = 1.0;
+            //     con2[i][j] = c2e;
+            //     phi[1][i][j] = 0.0;
+            //     con1[i][j] = c1e;
+            //     phi[0][i][j] = 0.0;
+            //     con0[i][j] = c02e;
+            // }
             else
             {
                 phi[1][i][j] = 0.0;
@@ -370,6 +369,22 @@ start:;
             phiNum[i][j] = phinum;
         }
     }
+
+    FILE *stream;
+    char buffer[30];
+    sprintf(buffer, "phinum.dat");
+    stream = fopen(buffer, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            fprintf(stream, "%d   ", phiNum[i][j]);
+            fprintf(stream, "\n");
+        }
+    }
+    fclose(stream);
+    FILE *fp;
 
     // Evolution Equation of Phase Fields
     for (i = 0; i <= ndm; i++)
