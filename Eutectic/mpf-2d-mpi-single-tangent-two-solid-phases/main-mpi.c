@@ -9,7 +9,7 @@
 #define NX 100
 #define NY 100
 #define PI 3.14159
-#define STEPS 199
+#define STEPS 1
 #define BEGIN 1
 #define UTAG 2
 #define DTAG 3
@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
         prtdat();
 
     int nm = N - 1;
+    int ndmx = NX - 1;
+    int ndmy = NY - 1;
 
     int nstep = 50001;
     int pstep = 500;
@@ -157,13 +159,13 @@ int main(int argc, char *argv[])
 
         double phi[2][N][NX][NY];
 
+        double intphi[NX][NY];
+
         int phiNum[NX][NY];
 
-        // initialize(NX, NY, &phi[0][0], &phi[0][1], &phi[0][2], con0, con1, con2, con, phiNum);
-        // savedata(NX, NY, &phi[0], 0, "initial.dat");
-        for (i = 0; i <= NX - 1; i++)
+        for (i = 0; i <= ndmx; i++)
         {
-            for (j = 0; j <= NY - 1; j++)
+            for (j = 0; j <= ndmy; j++)
             {
                 if ((i - NX / 2) * (i - NX / 2) + (j - NY / 2) * (j - NY / 2) <= 400)
                 {
@@ -179,6 +181,8 @@ int main(int argc, char *argv[])
                 }
             }
         }
+
+        savedata(NX, NY, &phi[0][1], "initialphi.dat");
 
         float u[2][NX][NY];
         inidat(NX, NY, u);
@@ -228,9 +232,9 @@ int main(int argc, char *argv[])
             MPI_Recv(&phiNum[offset], rows * NY, MPI_INT, source,
                      msgtype, MPI_COMM_WORLD, &status);
             //// receive phase fields
-            // MPI_Recv(&phi[1][offset], rows * NY * N, MPI_DOUBLE, source,
-            //          msgtype, MPI_COMM_WORLD, &status);
-            //// receive con fields
+            MPI_Recv(&intphi[offset], rows * NY, MPI_DOUBLE, source,
+                     msgtype, MPI_COMM_WORLD, &status);
+            // receive con fields
             MPI_Recv(&con0[offset], rows * NY, MPI_DOUBLE, source,
                      msgtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&con1[offset], rows * NY, MPI_DOUBLE, source,
@@ -241,7 +245,7 @@ int main(int argc, char *argv[])
                      msgtype, MPI_COMM_WORLD, &status);
         }
         prtdat(NX, NY, u, "final.dat");
-        savedata(NX, NY, &phi[0][0], "returnphi.dat");
+        savedata(NX, NY, &intphi[0], "intphi.dat");
         saveint(NX, NY, phiNum, "phinum.dat");
 
         MPI_Finalize();
@@ -261,6 +265,8 @@ int main(int argc, char *argv[])
 
         int phiNum[rows + 2][NY];
         int phiIdx[N + 1][rows + 2][NY];
+
+        double intphi[rows][NY];
         // Initialize with zero
         for (ix = 0; ix <= rows + 1; ix++)
         {
@@ -269,9 +275,9 @@ int main(int argc, char *argv[])
                 for (iz = 0; iz <= 1; iz++)
                 {
                     u[iz][ix][iy] = 0.0;
-                    phi[0][iz][ix][iy] = 0.0;
-                    phi[1][iz][ix][iy] = 0.0;
-                    phi[2][iz][ix][iy] = 0.0;
+                    phi[iz][0][ix][iy] = 0.0;
+                    phi[iz][1][ix][iy] = 0.0;
+                    phi[iz][2][ix][iy] = 0.0;
                     con[iz][ix][iy] = 0.0;
                 }
                 con0[ix][iy] = 0.0;
@@ -385,33 +391,31 @@ int main(int argc, char *argv[])
             // Compute after sending and receiving data
             start = 1;
             end = rows;
-            if (up == NONE)
-                start = 2;
-            if (down == NONE)
-                end = rows - 1;
-            update(start, end, NY, &u[iz], &u[1 - iz]);
-
-            // compute(start, end, rows + 2, NY,
-            //         nm, phiNum, phiIdx,
-            //         &phi[iz][0], &phi[iz][1], &phi[iz][2], &phi[1 - iz],
-            //         aij, wij, mij,
-            //         dx, dtime);
+            // update(start, end, NY, &u[iz], &u[1 - iz]);
 
             for (i = start; i <= end; i++)
             {
-                for (j = 0; j <= NY - 1; j++)
+                for (j = 0; j <= ndmy; j++)
                 {
                     ip = i + 1;
                     im = i - 1;
                     jp = j + 1;
                     jm = j - 1;
-                    if (j == NY - 1)
+                    if (up == NONE && i == 1)
+                    {
+                        im = 1;
+                    }
+                    if (down == NONE && i == rows)
+                    {
+                        ip = rows;
+                    }
+                    if (j == ndmy)
                     {
                         jp = 0;
                     }
                     if (j == 0)
                     {
-                        jm = NY - 1;
+                        jm = ndmy;
                     }
 
                     int phinum = 0;
@@ -430,21 +434,30 @@ int main(int argc, char *argv[])
                     phiNum[i][j] = phinum;
                 }
             }
-
-            iz = 1 - iz;
+            // iz = 1 - iz;
         }
 
+        for (i = start; i <= end; i++)
+        {
+            for (j = 0; j <= ndmy; j++)
+            {
+                for (ii = 0; ii < nm; ii++)
+                {
+                    intphi[i - 1][j] += phi[iz][ii][i][j] * phi[iz][ii][i][j];
+                }
+            }
+        }
         // Send final result to master
         MPI_Send(&offset, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&rows, 1, MPI_INT, MASTER, DONE, MPI_COMM_WORLD);
         MPI_Send(&u[iz][1], rows * NY, MPI_FLOAT, MASTER, DONE,
                  MPI_COMM_WORLD);
-        MPI_Send(&phiNum[1], rows * NY, MPI_FLOAT, MASTER, DONE,
+        MPI_Send(&phiNum[1], rows * NY, MPI_INT, MASTER, DONE,
                  MPI_COMM_WORLD);
         //// send phase fields
-        // MPI_Send(&phi[iz][1], rows * NY * N, MPI_DOUBLE, MASTER, DONE,
-        //          MPI_COMM_WORLD);
-        //// send con fields
+        MPI_Send(&intphi[0], rows * NY, MPI_DOUBLE, MASTER, DONE,
+                 MPI_COMM_WORLD);
+        // send con fields
         MPI_Send(&con0[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
                  MPI_COMM_WORLD);
         MPI_Send(&con1[1], rows * NY, MPI_DOUBLE, MASTER, DONE,
@@ -471,40 +484,6 @@ void update(int start, int end, int ny, float *u1, float *u2)
                                                2.0 * *(u1 + ix * ny + iy));
 }
 
-void initialize(int nx, int ny,
-                double *phi0, double *phi1, double *phi2,
-                double *con0, double *con1, double *con2, double *con, int *phiNum)
-{
-    int ix, iy;
-    double sum1 = 0.0;
-
-    for (ix = 0; ix <= nx - 1; ix++)
-    {
-        for (iy = 0; iy <= ny - 1; iy++)
-        {
-            if ((ix - nx / 2) * (ix - nx / 2) + (iy - ny / 2) * (iy - ny / 2) < 400)
-            {
-                *(phi1 + ix * ny + iy) = 1.0;
-                *(con1 + ix * ny + iy) = 0.1;
-                *(phi2 + ix * ny + iy) = 0.0;
-                *(con2 + ix * ny + iy) = 0.8;
-                *(phi0 + ix * ny + iy) = 0.0;
-                *(con0 + ix * ny + iy) = 0.3;
-            }
-            else
-            {
-                *(phi1 + ix * ny + iy) = 0.0;
-                *(con1 + ix * ny + iy) = 0.1;
-                *(phi2 + ix * ny + iy) = 0.0;
-                *(con2 + ix * ny + iy) = 0.8;
-                *(phi0 + ix * ny + iy) = 1.0;
-                *(con0 + ix * ny + iy) = 0.2;
-            }
-            // *(con + ix * ny + iy) = *(phi1 + ix * ny + iy + 1) * *(con1 + ix * ny + iy) + *(phi + ix * ny + iy + 2) * *(con2 + ix * ny + iy) + *(phi + ix * ny + iy) * *(con0 + ix * ny + iy);
-        }
-    }
-}
-
 void savedata(int nx, int ny, double *data, char *fnam)
 {
     int ix, iy;
@@ -520,126 +499,6 @@ void savedata(int nx, int ny, double *data, char *fnam)
         }
     }
     fclose(fp);
-}
-
-void compute(int start, int end, int rx, int ny,
-             int nm, int *phiNum, int *phiIdx,
-             double *phi0, double *phi1, double *phi2, double *phin,
-             double *aij, double *wij, double *mij,
-             double dx, double dtime)
-{
-    // Collect local info of phase fields
-    int ix, iy, iym, iyp,
-        ii, jj, kk;
-
-    int phinum = 0;
-
-    for (ix = start; ix <= end; ix++)
-    {
-        for (iy = 0; iy <= ny - 1; iy++)
-        {
-            if (iy == 0)
-            {
-                iym = ny - 1;
-            }
-            if (iy == ny - 1)
-            {
-                iyp = 0;
-            }
-
-            if ((*(phi0 + ix * ny + iy) > 1.0) || (*(phi0 + ix * ny + iy) == 0.0) && (*(phi0 + (ix + 1) * ny + iy) > 0.0) ||
-                (*(phi0 + (ix - 1) * ny + iy) > 0.0) ||
-                (*(phi0 + ix * ny + iyp) > 0.0) ||
-                (*(phi0 + ix * ny + iym) > 0.0))
-            {
-                phinum += 1;
-            }
-
-            if ((*(phi1 + ix * ny + iy) > 1.0) || (*(phi1 + ix * ny + iy) == 0.0) && (*(phi1 + (ix + 1) * ny + iy) > 0.0) ||
-                (*(phi1 + (ix - 1) * ny + iy) > 0.0) ||
-                (*(phi1 + ix * ny + iyp) > 0.0) ||
-                (*(phi1 + ix * ny + iym) > 0.0))
-            {
-                phinum += 1;
-            }
-
-            if ((*(phi2 + ix * ny + iy) > 1.0) || (*(phi2 + ix * ny + iy) == 0.0) && (*(phi2 + (ix + 1) * ny + iy) > 0.0) ||
-                (*(phi2 + (ix - 1) * ny + iy) > 0.0) ||
-                (*(phi2 + ix * ny + iyp) > 0.0) ||
-                (*(phi2 + ix * ny + iym) > 0.0))
-            {
-                phinum += 1;
-            }
-
-            // for (ii = 0; ii <= 2; ii++)
-            // {
-            //     if ((*(phio + ii * rx * ny + ix * ny + iy) > 1.0) || (*(phio + ii * rx * ny + ix * ny + iy) == 0.0) && (*(phio + ii * rx * ny + (ix + 1) * ny + iy) > 0.0) ||
-            //         (*(phio + ii * rx * ny + (ix - 1) * ny + iy) > 0.0) ||
-            //         (*(phio + ii * rx * ny + ix * ny + iyp) > 0.0) ||
-            //         (*(phio + ii * rx * ny + ix * ny + iym) > 0.0))
-            //     {
-            //         phinum += 1;
-            //         *(phiIdx + phinum * rx * ny + ix * ny + iy) = ii;
-            //     }
-            // }
-            *(phiNum + ix * ny + iy) = phinum;
-            phinum = 0;
-        }
-    }
-
-    // int n1, n2, n3;
-    // double dpdt, sum, termiikk, termjjkk;
-    // double dF;
-
-    // for (ix = start; ix <= end; ix++)
-    // {
-    //     for (iy = 1; iy <= ny - 2; iy++)
-    //     {
-
-    //         for (n1 = 1; n1 <= *(phiNum + ix * ny + iy); n1++)
-    //         {
-    //             ii = *(phiIdx + n1 * nx * ny + ix * ny + iy);
-    //             dpdt = 0.0;
-    //             for (n2 = 1; n2 <= *(phiNum + ix * ny + iy); n2++)
-    //             {
-    //                 jj = *(phiIdx + n2 * nx * ny + ix * ny + iy);
-    //                 sum = 0.0;
-    //                 for (n3 = 1; n3 <= *(phiNum + ix * ny + iy); n3++)
-    //                 {
-    //                     kk = *(phiIdx + n3 * nx * ny + ix * ny + iy);
-
-    //                     termiikk = *(aij + ii * (nm + 1) + kk) * (*(phio + kk * nx * ny + (ix + 1) * ny + iy) + *(phio + kk * nx * ny + (ix - 1) * ny + iy) + *(phio + kk * nx * ny + ix * ny + iy + 1) + *(phio + kk * nx * ny + ix * ny + iy - 1) - 4.0 * *(phio + kk * nx * ny + ix * ny + iy)) / (dx * dx);
-
-    //                     termjjkk = *(aij + jj * (nm + 1) + kk) * (*(phio + kk * nx * ny + (ix + 1) * ny + iy) + *(phio + kk * nx * ny + (ix - 1) * ny + iy) + *(phio + kk * nx * ny + ix * ny + iy + 1) + *(phio + kk * nx * ny + ix * ny + iy - 1) - 4.0 * *(phio + kk * nx * ny + ix * ny + iy)) / (dx * dx);
-
-    //                     sum += 0.5 * (termiikk - termjjkk) + (*(wij + ii * (nm + 1) + kk) - *(wij + jj * (nm + 1) + kk)) * *(phio + kk * nx * ny + ix * ny + iy);
-    //                 }
-    //                 if (ii == 1 && jj == 0)
-    //                 {
-    //                     dF = 2.0e6;
-    //                 }
-    //                 else if (ii == 0 && jj == 1)
-    //                 {
-    //                     dF = -2.0e6;
-    //                 }
-    //                 else
-    //                 {
-    //                     dF = 0.0;
-    //                 }
-    //                 dpdt += -2.0 * (*(mij + ii * (nm + 1) + jj) / (double)*(phiNum + ix * ny + iy)) * (sum - 8.0 / PI * dF * sqrt(*(phio + ii * nx * ny + ix * ny + iy) * *(phio + jj * nx * ny + ix * ny + iy)));
-    //             }
-    //             *(phin + ii * nx * ny + ix * ny + iy) = *(phio + ii * nx * ny + ix * ny + iy) + dpdt * dtime;
-    //             if (*(phin + ii * nx * ny + ix * ny + iy) >= 1.0)
-    //             {
-    //                 *(phin + ii * nx * ny + ix * ny + iy) = 1.0;
-    //             }
-    //             if (*(phin + ii * nx * ny + ix * ny + iy) <= 0.0)
-    //             {
-    //                 *(phin + ii * nx * ny + ix * ny + iy) = 0.0;
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 void saveint(int nx, int ny, int *data, char *fnam)
