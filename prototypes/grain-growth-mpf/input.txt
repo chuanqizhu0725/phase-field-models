@@ -1,4 +1,4 @@
-nstep#2001
+nstep#10001
 dtime#5.0
 temp#1000.0
 L#2000.0

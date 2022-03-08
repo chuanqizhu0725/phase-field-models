@@ -19,10 +19,12 @@ int main(void)
     initialize();
 
     log();
+    clock_t start_t, end_t, total_t;
+    start_t = clock();
 
 start:;
 
-    if ((((int)(istep) % 2000) == 0))
+    if ((((int)(istep) % 10000) == 0))
     {
         datasave(istep);
     }
@@ -162,5 +164,9 @@ start:;
     }
 
 end:;
+    end_t = clock();
+    total_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
+    printf("Total time taken: %lu secs\n", total_t);
+    printf("Exiting of the program...\n");
     return 0;
 }

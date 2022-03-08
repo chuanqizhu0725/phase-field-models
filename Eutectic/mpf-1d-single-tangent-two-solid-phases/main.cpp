@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 500001;
-int pstep = 50000;
+int nstep = 50001;
+int pstep = 10000;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -31,7 +31,7 @@ double mobi = 4.20951e-05;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 5.0e4;
+double F0 = 4.0e5;
 
 double Ds = 0.1e-6;
 double Dl = 0.5e-5;
@@ -116,15 +116,15 @@ int main(void)
             phi[0][i] = 0.0;
             con0[i] = c010;
         }
-        else if (i >= ND * 7 / 8)
-        {
-            phi[2][i] = 1.0;
-            con2[i] = c20;
-            phi[1][i] = 0.0;
-            con1[i] = c10;
-            phi[0][i] = 0.0;
-            con0[i] = c020;
-        }
+        // else if (i >= ND * 7 / 8)
+        // {
+        //     phi[2][i] = 1.0;
+        //     con2[i] = c20;
+        //     phi[1][i] = 0.0;
+        //     con1[i] = c10;
+        //     phi[0][i] = 0.0;
+        //     con0[i] = c020;
+        // }
         else
         {
             phi[1][i] = 0.0;
@@ -132,7 +132,7 @@ int main(void)
             phi[2][i] = 0.0;
             con2[i] = c20;
             phi[0][i] = 1.0;
-            con0[i] = 0.4;
+            con0[i] = 0.2;
         }
         con[i] = phi[1][i] * con1[i] + phi[2][i] * con2[i] + phi[0][i] * con0[i];
         con_new[i] = con[i];
@@ -294,19 +294,19 @@ start:;
                 }
                 if (ii == 1 && jj == 0)
                 {
-                    dF = F0 * (c010 - con0[i]) * 40;
+                    dF = F0 * (c010 - con0[i]);
                 }
                 else if (ii == 0 && jj == 1)
                 {
-                    dF = -F0 * (c010 - con0[i]) * 40;
+                    dF = -F0 * (c010 - con0[i]);
                 }
                 else if (ii == 2 && jj == 0)
                 {
-                    dF = -F0 * (c020 - con0[i]) * 40;
+                    dF = -F0 * (c020 - con0[i]);
                 }
                 else if (ii == 0 && jj == 2)
                 {
-                    dF = F0 * (c020 - con0[i]) * 40;
+                    dF = F0 * (c020 - con0[i]);
                 }
                 else
                 {

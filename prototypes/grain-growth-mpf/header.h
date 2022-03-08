@@ -14,7 +14,7 @@ using namespace std;
 #define DRND(x) ((double)(x) / RAND_MAX * rand()) //乱数の設定
 
 #define ND 100 //差分計算における計算領域一辺の分割数
-#define N 21   //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
+#define N 40   //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
 
 int nd = ND,
     ndm = ND - 1;            //計算領域の一辺の差分分割数(差分ブロック数), ND-1を定義
@@ -168,7 +168,7 @@ void datasave(int step)
     FILE *stream; //ストリームのポインタ設定
     char buffer[30];
     sprintf(buffer, "data/test%d.csv", step);
-    stream = fopen(buffer, "a"); //書き込む先のファイルを追記方式でオープン
+    stream = fopen(buffer, "w"); //書き込む先のファイルを追記方式でオープン
 
     for (int i = 0; i <= ndm; i++)
     {

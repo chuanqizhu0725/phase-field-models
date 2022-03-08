@@ -28,7 +28,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-extern void draw_heat(int nx, int ny); /* X routine to create graph */
+// extern void draw_heat(int nx, int ny); /* X routine to create graph */
 
 #define NXPROB 20   /* x dimension of problem grid */
 #define NYPROB 20   /* y dimension of problem grid */
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
         prtdat(NXPROB, NYPROB, &u[0][0][0], "final.dat");
         printf("Click on MORE button to view initial/final states.\n");
         printf("Click on EXIT button to quit program.\n");
-        draw_heat(NXPROB, NYPROB);
+        // draw_heat(NXPROB, NYPROB);
         MPI_Finalize();
     } /* End of master code */
 

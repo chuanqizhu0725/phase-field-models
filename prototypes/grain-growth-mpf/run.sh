@@ -1,1 +1,1 @@
-g++ *.cpp -o main && ./main && python plot.py
+g++ *.cpp -o main && rm data/*.csv && ./main && python plot.py

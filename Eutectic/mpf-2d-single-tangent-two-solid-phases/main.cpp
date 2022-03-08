@@ -21,8 +21,8 @@ int ndm = ND - 1;
 int nstep = 50001;
 int pstep = 500;
 
-double dx = 1.0e-7;
-double dtime = 4.0e-10;
+double dx = 1.0e-8;
+double dtime = 4.0e-12;
 
 double gamma0 = 0.1;
 double astre = 0.05;
@@ -33,7 +33,7 @@ double mobi = 4.2e-5;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F10 = 2.0e6;
+double F10 = 9.0e6;
 double F20 = 2.0e6;
 
 double Ds = 0.1e-6;
@@ -42,7 +42,7 @@ double Dl = 0.2e-5;
 double temp = 600.0; // K
 double Te = 800.0;
 double ce = 0.4;
-double cl = 0.2;
+double cl = 0.4;
 
 double ml1 = -2000.0;
 double kap1 = 0.25;
@@ -129,13 +129,14 @@ int main(void)
         }
     }
 
+    // Initialize the con field and phase fields
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
         {
-            // if (i <= ND / 8)
-            if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 25)
+            if (i <= ND / 8 && j < ND / 2)
+            // if ((i - ND / 2) * (i - ND / 2) + (j - ND / 2) * (j - ND / 2) <= 25)
             {
                 phi[1][i][j] = 1.0;
                 con1[i][j] = c1e;
@@ -144,15 +145,15 @@ int main(void)
                 phi[0][i][j] = 0.0;
                 con0[i][j] = c01e;
             }
-            // else if (i <= ND / 8 && j >= ND / 2)
-            // {
-            //     phi[2][i][j] = 1.0;
-            //     con2[i][j] = c2e;
-            //     phi[1][i][j] = 0.0;
-            //     con1[i][j] = c1e;
-            //     phi[0][i][j] = 0.0;
-            //     con0[i][j] = c02e;
-            // }
+            else if (i <= ND / 8 && j >= ND / 2)
+            {
+                phi[2][i][j] = 1.0;
+                con2[i][j] = c2e;
+                phi[1][i][j] = 0.0;
+                con1[i][j] = c1e;
+                phi[0][i][j] = 0.0;
+                con0[i][j] = c02e;
+            }
             else
             {
                 phi[1][i][j] = 0.0;
@@ -172,6 +173,7 @@ int main(void)
 
 start:;
 
+    // Log in console and output raw data
     if ((((int)(istep) % pstep) == 0))
     {
         datasave(istep);
@@ -188,49 +190,7 @@ start:;
         cout << "nominal concentration is: " << sum1 / ND / ND << endl;
     }
 
-    for (i = 0; i <= ndm; i++)
-    {
-        for (j = 0; j <= ndm; j++)
-        {
-            ip = i + 1;
-            im = i - 1;
-            jp = j + 1;
-            jm = j - 1;
-            if (i == ndm)
-            {
-                ip = 0;
-            }
-            if (i == 0)
-            {
-                im = ndm;
-            }
-            if (j == ndm)
-            {
-                jp = 0;
-            }
-            if (j == 0)
-            {
-                jm = ndm;
-            }
-
-            phinum = 0;
-            for (ii = 0; ii <= nm; ii++)
-            {
-                if ((phi[ii][i][j] > 0.0) ||
-                    ((phi[ii][i][j] == 0.0) && (phi[ii][ip][j] > 0.0) ||
-                     (phi[ii][im][j] > 0.0) ||
-                     (phi[ii][i][jp] > 0.0) ||
-                     (phi[ii][i][jm] > 0.0)))
-                {
-                    phinum++;
-                    phiIdx[phinum][i][j] = ii;
-                }
-            }
-            phiNum[i][j] = phinum;
-        }
-    }
-
-    // Calculate the concentration field in solid and liqud phase based on local concentration and equilibrium rule.
+    // Calculate local concentration
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
@@ -284,30 +244,30 @@ start:;
     }
 
     // Evolution Equation of Concentration field
-    for (i = 1; i <= ndm - 1; i++)
+    for (i = 0; i <= ndm; i++)
     {
-        for (j = 1; j <= ndm - 1; j++)
+        for (j = 0; j <= ndm; j++)
         {
             ip = i + 1;
             im = i - 1;
             jp = j + 1;
             jm = j - 1;
-            // if (i == ndm)
-            // {
-            //     ip = 0;
-            // }
-            // if (i == 0)
-            // {
-            //     im = ndm;
-            // }
-            // if (j == ndm)
-            // {
-            //     jp = 0;
-            // }
-            // if (j == 0)
-            // {
-            //     jm = ndm;
-            // }
+            if (i == ndm)
+            {
+                ip = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+            }
+            if (j == ndm)
+            {
+                jp = 0;
+            }
+            if (j == 0)
+            {
+                jm = ndm;
+            }
 
             phis_ij = phi[1][i][j] + phi[2][i][j];
             phis_ipj = phi[1][ip][j] + phi[2][ip][j];
@@ -327,11 +287,12 @@ start:;
             dev2_l = phi[0][i][j] * (con0[ip][j] + con0[im][j] + con0[i][jp] + con0[i][jm] - 4.0 * con0[i][j]) / dx / dx;
 
             cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l);
-            con_new[i][j] = con[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
+            con_new[i][j] = con[i][j] + cddtt * dtime;
             // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001;
         }
     }
 
+    // Update con
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
@@ -349,6 +310,7 @@ start:;
         }
     }
 
+    // Remove numerical addtion of concentration
     dc0 = sum1 / ND / ND - c0;
     for (i = 0; i <= ndm; i++)
     {
@@ -363,6 +325,49 @@ start:;
             {
                 con[i][j] = 0.0;
             }
+        }
+    }
+
+    // Collection local infomation of phase fields
+    for (i = 0; i <= ndm; i++)
+    {
+        for (j = 0; j <= ndm; j++)
+        {
+            ip = i + 1;
+            im = i - 1;
+            jp = j + 1;
+            jm = j - 1;
+            if (i == ndm)
+            {
+                ip = 0;
+            }
+            if (i == 0)
+            {
+                im = ndm;
+            }
+            if (j == ndm)
+            {
+                jp = 0;
+            }
+            if (j == 0)
+            {
+                jm = ndm;
+            }
+
+            phinum = 0;
+            for (ii = 0; ii <= nm; ii++)
+            {
+                if ((phi[ii][i][j] > 0.0) ||
+                    ((phi[ii][i][j] == 0.0) && (phi[ii][ip][j] > 0.0) ||
+                     (phi[ii][im][j] > 0.0) ||
+                     (phi[ii][i][jp] > 0.0) ||
+                     (phi[ii][i][jm] > 0.0)))
+                {
+                    phinum++;
+                    phiIdx[phinum][i][j] = ii;
+                }
+            }
+            phiNum[i][j] = phinum;
         }
     }
 
@@ -446,11 +451,11 @@ start:;
                     }
                     if (ii == 1 && jj == 0)
                     {
-                        dF = F10 * (c01e - con0[i][j]);
+                        dF = F10 * (c01e - con0[i][j]) * (1 + 0.2 * (DRND(1.0) - 0.5));
                     }
                     else if (ii == 0 && jj == 1)
                     {
-                        dF = -F10 * (c01e - con0[i][j]);
+                        dF = -F10 * (c01e - con0[i][j]) * (1 + 0.2 * (DRND(1.0) - 0.5));
                     }
                     else if (ii == 2 && jj == 0)
                     {
@@ -479,6 +484,7 @@ start:;
         } // i
     }
 
+    // Update phi
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
@@ -490,6 +496,7 @@ start:;
         }
     }
 
+    // Normalize phi
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
