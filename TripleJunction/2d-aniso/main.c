@@ -56,6 +56,7 @@ double vm0;    //モル体積
 
 double astre;
 double theta, theta0;
+double thetax, thetay;
 double epsilon0;
 double termiikk, termjjkk;
 
@@ -295,7 +296,12 @@ start:;
                             thetax = (phidxy * phidx - phidxx * phidy) / (phidx * phidx + phidy * phidy);
                             thetay = (phidyy * phidx - phidxy * phidy) / (phidx * phidx + phidy * phidy);
 
-                            termiikk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
+                            termiikk = ep * ep * (phidxx + phidyy) +
+                                       2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) -
+                                       (ep1p * ep1p + ep * ep2p) * (phidxy * phidx * phidy - phidxx * phidy * phidy) / (phidx * phidx + phidy * phidy) +
+                                       (ep1p * ep1p + ep * ep2p) * (phidyy * phidx * phidx - phidxy * phidx * phidy) / (phidx * phidx + phidy * phidy);
+
+                            // termiikk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
                         }
                         else
                         {
@@ -311,7 +317,13 @@ start:;
                             ep1p = -epsilon0 * astre * 4.0 * sin(4.0 * (theta - theta0));       // epの角度による１階微分
                             ep2p = -epsilon0 * astre * 4.0 * 4.0 * cos(4.0 * (theta - theta0)); // epの角度による２階微分
 
-                            termjjkk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
+                            thetax = (phidxy * phidx - phidxx * phidy) / (phidx * phidx + phidy * phidy);
+                            thetay = (phidyy * phidx - phidxy * phidy) / (phidx * phidx + phidy * phidy);
+
+                            termjjkk = ep * ep * (phidxx + phidyy) +
+                                       2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) -
+                                       (ep1p * ep1p + ep * ep2p) * (phidxy * phidx * phidy - phidxx * phidy * phidy) / (phidx * phidx + phidy * phidy) +
+                                       (ep1p * ep1p + ep * ep2p) * (phidyy * phidx * phidx - phidxy * phidx * phidy) / (phidx * phidx + phidy * phidy);
                         }
                         else
                         {
