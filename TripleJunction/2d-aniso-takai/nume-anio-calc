@@ -35,7 +35,8 @@ int phinum;
 
 int i, j, k, l, ii, jj, kk, ll, it; //整数
 int ip, im, jp, jm;                 //整数
-int n1, n2, n3;                     //整数
+int ipp, imm, jpp, jmm;
+int n1, n2, n3; //整数
 
 int istep = 0;
 // int n000;		//位置(i,j)において、pが０ではない方位の個数（n00>=n000）
@@ -55,8 +56,10 @@ double mobi;   //粒界の易動度
 double vm0;    //モル体積
 
 double astre;
-double theta, theta0;
-double thetax, thetay;
+double theta, theta0, thetax, thetay;
+double thetaipj, thetaimj, thetaijp, thetaijm;
+double epipj, epimj, epijp, epijm;
+double ep1pipj, ep1pimj, ep1pijp, ep1pijm;
 double epsilon0;
 double termiikk, termjjkk;
 
@@ -81,7 +84,7 @@ int main(int argc, char *argv[])
 
     dx = L / (double)NDX * 1.0e-9;       //差分プロック１辺の長さ(m)
     gamma0 = 0.5 * vm0 / RR / temp / dx; //粒界エネルギ密度（0.5J/m^2）を無次元化
-    astre = 0.07;
+    astre = 0.03;
     A0 = 8.0 * delta * gamma0 / PI / PI; //勾配エネルギー係数[式(4.40)]
     W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
     M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
@@ -249,21 +252,41 @@ start:;
             im = i - 1;
             jp = j + 1;
             jm = j - 1;
+            if (i == ndmx - 1)
+            {
+                ipp = ndmx;
+            }
             if (i == ndmx)
             {
                 ip = ndmx;
+                ipp = ndmx - 1;
             }
             if (i == 0)
             {
                 im = 0;
-            } //周期的境界条件
+                imm = 1;
+            }
+            if (i == 1)
+            {
+                imm = 0;
+            }
+            if (j == ndmy - 1)
+            {
+                jpp = 0;
+            }
             if (j == ndmy)
             {
                 jp = 0;
+                jpp = jp + 1;
             }
             if (j == 0)
             {
                 jm = ndmy;
+                jmm = jm - 1;
+            }
+            if (j == 1)
+            {
+                jmm = ndmy;
             }
 
             for (n1 = 1; n1 <= phiNum[i][j]; n1++)
@@ -296,10 +319,22 @@ start:;
                             thetax = (phidxy * phidx - phidxx * phidy) / (phidx * phidx + phidy * phidy);
                             thetay = (phidyy * phidx - phidxy * phidy) / (phidx * phidx + phidy * phidy);
 
-                            termiikk = ep * ep * (phidxx + phidyy) +
-                                       2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) -
-                                       (ep1p * ep1p + ep * ep2p) * (phidxy * phidx * phidy - phidxx * phidy * phidy) / (phidx * phidx + phidy * phidy) +
-                                       (ep1p * ep1p + ep * ep2p) * (phidyy * phidx * phidx - phidxy * phidx * phidy) / (phidx * phidx + phidy * phidy);
+                            thetaipj = calcTheta((phi[kk][ip][jp] - phi[kk][ip][jm]) / 2.0, (phi[kk][ipp][j] - phi[kk][i][j]) / 2.0);
+                            thetaimj = calcTheta((phi[kk][im][jp] - phi[kk][im][jm]) / 2.0, (phi[kk][i][j] - phi[kk][imm][j]) / 2.0);
+                            thetaijp = calcTheta((phi[kk][i][jpp] - phi[kk][i][j]) / 2.0, (phi[kk][ip][jp] - phi[kk][im][jp]) / 2.0);
+                            thetaijm = calcTheta((phi[kk][i][j] - phi[kk][i][jmm]) / 2.0, (phi[kk][ip][jm] - phi[kk][im][jm]) / 2.0);
+
+                            epipj = epsilon0 * (1.0 + astre * cos(4.0 * (thetaipj - theta0)));
+                            epimj = epsilon0 * (1.0 + astre * cos(4.0 * (thetaimj - theta0)));
+                            epijp = epsilon0 * (1.0 + astre * cos(4.0 * (thetaijp - theta0)));
+                            epijm = epsilon0 * (1.0 + astre * cos(4.0 * (thetaijm - theta0)));
+
+                            ep1pipj = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaipj - theta0));
+                            ep1pimj = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaimj - theta0));
+                            ep1pijp = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaijp - theta0));
+                            ep1pijm = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaijm - theta0));
+
+                            termiikk = ep * ep * (phidxx + phidyy) + 2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) - (epipj * ep1pipj - epimj * ep1pimj) / 2.0 * phidy + (epijp * ep1pijp - epijm * ep1pijm) / 2.0 * phidx;
 
                             // termiikk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
                         }
@@ -320,10 +355,24 @@ start:;
                             thetax = (phidxy * phidx - phidxx * phidy) / (phidx * phidx + phidy * phidy);
                             thetay = (phidyy * phidx - phidxy * phidy) / (phidx * phidx + phidy * phidy);
 
-                            termjjkk = ep * ep * (phidxx + phidyy) +
-                                       2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) -
-                                       (ep1p * ep1p + ep * ep2p) * (phidxy * phidx * phidy - phidxx * phidy * phidy) / (phidx * phidx + phidy * phidy) +
-                                       (ep1p * ep1p + ep * ep2p) * (phidyy * phidx * phidx - phidxy * phidx * phidy) / (phidx * phidx + phidy * phidy);
+                            thetaipj = calcTheta((phi[kk][ip][jp] - phi[kk][ip][jm]) / 2.0, (phi[kk][ipp][j] - phi[kk][i][j]) / 2.0);
+                            thetaimj = calcTheta((phi[kk][im][jp] - phi[kk][im][jm]) / 2.0, (phi[kk][i][j] - phi[kk][imm][j]) / 2.0);
+                            thetaijp = calcTheta((phi[kk][i][jpp] - phi[kk][i][j]) / 2.0, (phi[kk][ip][jp] - phi[kk][im][jp]) / 2.0);
+                            thetaijm = calcTheta((phi[kk][i][j] - phi[kk][i][jmm]) / 2.0, (phi[kk][ip][jm] - phi[kk][im][jm]) / 2.0);
+
+                            epipj = epsilon0 * (1.0 + astre * cos(4.0 * (thetaipj - theta0)));
+                            epimj = epsilon0 * (1.0 + astre * cos(4.0 * (thetaimj - theta0)));
+                            epijp = epsilon0 * (1.0 + astre * cos(4.0 * (thetaijp - theta0)));
+                            epijm = epsilon0 * (1.0 + astre * cos(4.0 * (thetaijm - theta0)));
+
+                            ep1pipj = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaipj - theta0));
+                            ep1pimj = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaimj - theta0));
+                            ep1pijp = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaijp - theta0));
+                            ep1pijm = -epsilon0 * astre * 4.0 * sin(4.0 * (thetaijm - theta0));
+
+                            termjjkk = ep * ep * (phidxx + phidyy) + 2.0 * ep * ep1p * (phidx * thetax + phidy * thetay) - (epipj * ep1pipj - epimj * ep1pimj) / 2.0 * phidy + (epijp * ep1pijp - epijm * ep1pijm) / 2.0 * phidx;
+
+                            // termjjkk = ep * ep * (phidxx + phidyy) + ep * ep1p * ((phidyy - phidxx) * sin(2.0 * theta) + 2.0 * phidxy * cos(2.0 * theta)) - 0.5 * (ep1p * ep1p + ep * ep2p) * (2.0 * phidxy * sin(2.0 * theta) - phidxx - phidyy - (phidyy - phidxx) * cos(2.0 * theta));
                         }
                         else
                         {

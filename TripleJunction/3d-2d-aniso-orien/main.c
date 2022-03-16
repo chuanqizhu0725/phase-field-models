@@ -60,6 +60,7 @@ double vm0;    //モル体積
 
 double astre;
 double theta, vphi;
+double alpha, beta, eta;
 double thetadx, thetady, thetadz;
 double vphidx, vphidy, vphidz;
 double epsilon0;
@@ -67,6 +68,7 @@ double term0, termx0, termy0, termx1, termy1, termz;
 double termiikk, termjjkk;
 
 double phidx, phidy, phidz;
+double phidxp, phidyp, phidzp;
 double phidxx, phidyy, phidzz;
 double phidxy, phidyz, phidxz;
 double ep, ept, eptv, eptt, epv, epvv, epvt;
@@ -95,6 +97,10 @@ int main(int argc, char *argv[])
     W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
     M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
     F0 = 50.0 / RR / temp;               //粒界移動の駆動力
+
+    alpha = 0.0;
+    beta = 0.0;
+    eta = 0.0;
 
     for (i = 1; i <= nm; i++)
     {
@@ -364,15 +370,15 @@ start:;
                             phidyz = (phi[kk][i][jp][lp] + phi[kk][i][jm][lm] - phi[kk][i][jm][lp] - phi[kk][i][jp][lm]) / 4.0;
 
                             // calculate the interface energy based on the normal vector direction
-                            if (anij[ii][kk] == 1 && (phidx * phidx + phidy * phidy != 0.0))
+                            if (anij[ii][kk] == 1)
                             {
+                                phidxp = cos(alpha) * cos(beta) * phidx - sin(alpha) * cos(beta) * phidy - sin(beta) * phidz;
+                                phidyp = (cos(eta) * sin(alpha) - sin(eta) * cos(alpha) * sin(beta)) * phidx + (cos(eta) * cos(alpha) + sin(eta) * sin(theta) * sin(beta)) * phidy - sin(eta) * cos(beta) * phidz;
+                                phidzp = (sin(eta) * sin(alpha) + cos(eta) * cos(alpha) * sin(beta)) * phidx + (sin(eta) * cos(alpha) - cos(eta) * sin(alpha) * sin(beta)) * phidy + cos(eta) * cos(beta) * phidz;
 
-                                // phidxp = cos(alpha) cos(beta) * phidx - sin(alpha) * cos(beta) * phidy - sin(beta) * phidz;
-                                // phidyp = (cos(eta) sin(alpha) - sin(eta) * cos(alpha) * sin(beta)) * phidx + (cos(eta) * cos(alpha) + sin(eta) sin(theta) * sin(beta)) * phidy - sin(eta) * cos(beta) * phidz;
-                                // phidzp =
                                 epsilon0 = sqrt(aij[ii][kk]);
-                                theta = calcTheta(phidy, phidx) - thij[ii][kk];
-                                vphi = calcVphi(phidx, phidy, phidz) - vphij[ii][kk];
+                                theta = calcTheta(phidyp, phidxp);
+                                vphi = calcVphi(phidxp, phidyp, phidzp);
 
                                 ep = epsilon0 * (1 - 3.0 * astre + 4.0 * astre * (pow(sin(vphi), 4.0) * (pow(cos(theta), 4.0) + pow(sin(theta), 4.0)) + pow(cos(vphi), 4.0)));
 
