@@ -1,0 +1,1 @@
+g++ *.c -o main && rm *.dat *.vtk && ./main && python plot.py
