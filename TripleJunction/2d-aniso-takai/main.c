@@ -13,9 +13,9 @@
 #include <sstream>
 #include <typeinfo>
 
-#define NDX 100 //差分計算における計算領域一辺の分割数
-#define NDY 100 //差分計算における計算領域一辺の分割数
-#define N 4     //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
+#define NDX 50 //差分計算における計算領域一辺の分割数
+#define NDY 50 //差分計算における計算領域一辺の分割数
+#define N 3    //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
 
 int ndx = NDX;
 int ndy = NDY;
@@ -69,15 +69,10 @@ double term0;
 double termx, termx0, termx1, termx0dx, termx1dx;
 double termy, termy0, termy1, termy0dy, termy1dy;
 
-int x11, y11, x1h[10], y1h[10]; //初期核の座標
-double t, r0, r;
-
-double calcTheta(double dy, double dx);
-
 //******* メインプログラム ******************************************
 int main(int argc, char *argv[])
 {
-    nstep = 10001;
+    nstep = 701;
     dtime = 5.0;
     temp = 1000.0;
     L = 2000.0;
@@ -122,8 +117,8 @@ int main(int argc, char *argv[])
             }
         }
     }
-    thij[1][3] = PI / 8.0;
-    thij[3][1] = PI / 8.0;
+    // thij[1][3] = PI / 8.0;
+    // thij[3][1] = PI / 8.0;
 
     double phi[N][NDX][NDY], phi2[N][NDX][NDY]; //フェーズフィールド、フェーズフィールド補助配列
     int phiIdx[N][NDX][NDY];                    //位置(i,j)およびその周囲(i±1,j±1)において、pが０ではない方位の番号
@@ -157,23 +152,16 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (i > NDX * 4 / 5 && j < NDY / 2)
+            // if (i * i + j * j < 100)
+            if ((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < 100)
             {
                 phi[1][i][j] = 1.0;
                 phi[2][i][j] = 0.0;
-                phi[3][i][j] = 0.0;
-            }
-            else if (i > NDX * 4 / 5 && j >= NDY / 2)
-            {
-                phi[1][i][j] = 0.0;
-                phi[2][i][j] = 1.0;
-                phi[3][i][j] = 0.0;
             }
             else
             {
                 phi[1][i][j] = 0.0;
-                phi[2][i][j] = 0.0;
-                phi[3][i][j] = 1.0;
+                phi[2][i][j] = 1.0;
             }
         }
     }
@@ -191,12 +179,7 @@ start:;
         {
             for (int j = 0; j <= ndmy; j++)
             {
-                sum2 = 0.0;
-                for (int k = 0; k <= nm; k++)
-                {
-                    sum2 += phi[k][i][j] * phi[k][i][j];
-                }
-                fprintf(fp, "%e\n", sum2);
+                fprintf(fp, "%e\n", phi[2][i][j]);
             }
         }
         fclose(fp);
@@ -212,11 +195,11 @@ start:;
             jm = j - 1;
             if (i == ndmx)
             {
-                ip = ndmx;
+                ip = 0;
             }
             if (i == 0)
             {
-                im = 0;
+                im = ndmx;
             }
             if (j == ndmy)
             {
@@ -257,11 +240,11 @@ start:;
             jm = j - 1;
             if (i == ndmx)
             {
-                ip = ndmx;
+                ip = 0;
             }
             if (i == 0)
             {
-                im = 0;
+                im = ndmx;
             } //周期的境界条件
             if (j == ndmy)
             {
@@ -290,7 +273,7 @@ start:;
                         phidyy = (phi[kk][i][jp] + phi[kk][i][jm] - 2.0 * phi[kk][i][j]);
                         phidxy = (phi[kk][ip][jp] + phi[kk][im][jm] - phi[kk][im][jp] - phi[kk][ip][jm]) / 4.0;
 
-                        if (anij[ii][kk] == 1)
+                        if (anij[ii][kk] == 1 && phidx * phidx + phidy * phidy != 0.0)
                         {
                             epsilon0 = sqrt(aij[ii][kk]);
                             theta0 = thij[ii][kk];
@@ -341,7 +324,7 @@ start:;
                             termiikk = aij[ii][kk] * (phidxx + phidyy);
                         }
 
-                        if (anij[jj][kk] == 1)
+                        if (anij[jj][kk] == 1 && phidx * phidx + phidy * phidy != 0.0)
                         {
                             epsilon0 = sqrt(aij[jj][kk]);
                             theta0 = thij[jj][kk];
@@ -393,7 +376,7 @@ start:;
 
                         sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i][j];
                     }
-                    pddtt += -2.0 * mij[ii][jj] / (double)phiNum[i][j] * (sum1 - 8.0 / PI * fij[ii][jj] * (0.5 * i * i / NDX / NDX) * sqrt(phi[ii][i][j] * phi[jj][i][j]));
+                    pddtt += -2.0 * mij[ii][jj] / (double)phiNum[i][j] * (sum1 - 8.0 / PI * fij[ii][jj] * sqrt(phi[ii][i][j] * phi[jj][i][j]));
                     //フェーズフィールドの発展方程式[式(4.31)]
                 }
                 phi2[ii][i][j] = phi[ii][i][j] + pddtt * dtime; //フェーズフィールドの時間発展（陽解法）
@@ -445,24 +428,4 @@ start:;
 
 end:;
     return 0;
-}
-
-double calcTheta(double dy, double dx)
-{
-    if (dx != 0.0)
-    {
-        return atan(dy / dx);
-    }
-    else if (dx == 0.0 && dy > 0)
-    {
-        return PI / 2.0;
-    }
-    else if (dx == 0.0 && dy < 0)
-    {
-        return PI / (-2.0);
-    }
-    else
-    {
-        return 0;
-    }
 }
