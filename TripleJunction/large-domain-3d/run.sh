@@ -1,0 +1,1 @@
+gcc *.c -o main && rm -f *.vtk && ./main

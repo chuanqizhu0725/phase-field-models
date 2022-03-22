@@ -80,7 +80,8 @@
     "memory_resource": "cpp",
     "stop_token": "cpp",
     "lateruse": "cpp",
-    "stdio.h": "c"
+    "stdio.h": "c",
+    "stdlib.h": "c"
   },
   "C_Cpp.errorSquiggles": "Disabled"
 }

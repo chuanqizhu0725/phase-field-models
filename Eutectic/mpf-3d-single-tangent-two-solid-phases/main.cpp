@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 5001;
-int pstep = 1000;
+int nstep = 1001;
+int pstep = 200;
 
 double dx = 1.0e-7;
 double dtime = 4.0e-10;
@@ -352,8 +352,8 @@ start:;
             }
         }
     }
-
     dc0 = sum1 / ND / ND / ND - c0;
+
     for (i = 0; i <= ndm; i++)
     {
         for (j = 0; j <= ndm; j++)
