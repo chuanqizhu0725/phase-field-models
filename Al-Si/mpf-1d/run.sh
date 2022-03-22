@@ -1,0 +1,1 @@
+g++ main.cpp -o main && rm -f data/phi/*.csv data/con/*.csv data/cons/*.csv data/conl/*.csv figures/phi/*.png figures/con/*.png && ./main && python plot.py

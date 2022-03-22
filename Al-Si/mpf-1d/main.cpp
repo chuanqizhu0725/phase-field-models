@@ -10,56 +10,41 @@
 
 using namespace std;
 
-#define N 3
-#define ND 256
+#define N 2
+#define ND 800
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 401;
-int pstep = 40;
+int nstep = 400001;
+int pstep = 10000;
 
 double dx = 1.0e-7;
-double dtime = 1.0e-6;
+double dtime = 4.0e-10;
 
 double gamma0 = 0.1;
 double delta = 6.0 * dx;
 
-double mobi = 1.20951e-8;
+double mobi = 4.20951e-05;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double F0 = 5.0e4;
 
-double temp = 880.0; // K
-double cl = 0.04;
-// double cl = 0.18;
+double As = 1.0e+02;
+double cs0 = 0.1;
+double Al = 1.0e+01;
+double cl0 = 0.4;
+double Ds = 0.1e-6;
+double Dl = 0.5e-5;
 
-// Linear phae diagram
-double Te = 850.0;
-double ce = 0.12;
-double ml1 = -690.0;
-double kap1 = 0.17;
-double c01e = ce + (temp - Te) / ml1;
-double c1e = c01e * kap1;
-
-double ml2 = 1165.0;
-double c02e = ce + (temp - Te) / ml2;
-double c2e = 1.0;
-
-double Ds = 1.0e-12;
-double Dl = 3.0e-9;
-
-double cont[ND], cont2[ND], conp[N][ND];
+double con[ND], con2[ND], cons[ND], conl[ND];
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][ND], phi2[N][ND];
-
-double phis_i, phis_ip, phis_im;
-double cons_i, cons_ip, cons_im;
 
 int phinum;
 int phiNum[ND];
@@ -113,28 +98,23 @@ int main(void)
     {
         if (i <= ND / 8)
         {
-            phi[1][i] = 1.0;
-            conp[1][i] = c1e;
-            phi[2][i] = 0.0;
-            conp[2][i] = c2e;
-            phi[0][i] = 0.0;
-            conp[0][i] = c01e;
+            phi[0][i] = 1.0;
+            cons[i] = 0.1;
+            phi[1][i] = 0.0;
+            conl[i] = 0.0;
         }
         else
         {
-            phi[1][i] = 0.0;
-            conp[1][i] = c1e;
-            phi[2][i] = 0.0;
-            conp[2][i] = c2e;
-            phi[0][i] = 1.0;
-            conp[0][i] = cl;
+            phi[0][i] = 0.0;
+            cons[i] = 0.0;
+            phi[1][i] = 1.0;
+            conl[i] = 0.2;
         }
-        cont[i] = phi[1][i] * conp[1][i] + phi[2][i] * conp[2][i] + phi[0][i] * conp[0][i];
-        cont2[i] = cont[i];
-        sum1 += cont[i];
+        con[i] = phi[0][i] * cons[i] + phi[1][i] * conl[i];
+        con2[i] = con[i];
+        sum1 += con[i];
     }
     c0 = sum1 / ND;
-    cout << "nominal concentration is: " << c0 << endl;
 
 start:;
 
@@ -142,13 +122,6 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
-
-        sum1 = 0.0;
-        for (i = 0; i <= ndm; i++)
-        {
-            sum1 += cont[i];
-        }
-        cout << "nominal concentration is: " << sum1 / ND << endl;
     }
 
     for (i = 0; i <= ndm; i++)
@@ -157,11 +130,11 @@ start:;
         im = i - 1;
         if (i == ndm)
         {
-            ip = ndm;
+            ip = ndm - 1;
         }
         if (i == 0)
         {
-            im = 0;
+            im = 1;
         }
 
         phinum = 0;
@@ -184,11 +157,11 @@ start:;
         im = i - 1;
         if (i == ndm)
         {
-            ip = ndm;
+            ip = 0;
         }
         if (i == 0)
         {
-            im = 0;
+            im = ndm;
         }
 
         for (n1 = 1; n1 <= phiNum[i]; n1++)
@@ -209,21 +182,13 @@ start:;
 
                     sum1 += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][i];
                 }
-                if (ii == 1 && jj == 0)
+                if (ii != nm && jj == nm)
                 {
-                    dF = F0 * ((conp[0][i] - ce) * ml1 + Te - temp);
+                    dF = F0 * (0.4 - conl[i]) * 40;
                 }
-                else if (ii == 0 && jj == 1)
+                else if (ii == nm && jj != nm)
                 {
-                    dF = -F0 * ((conp[0][i] - ce) * ml1 + Te - temp);
-                }
-                else if (ii == 2 && jj == 0)
-                {
-                    dF = F0 * ((conp[0][i] - ce) * ml2 + Te - temp);
-                }
-                else if (ii == 0 && jj == 2)
-                {
-                    dF = -F0 * ((conp[0][i] - ce) * ml2 + Te - temp);
+                    dF = -F0 * (0.4 - conl[i]) * 40;
                 }
                 else
                 {
@@ -266,105 +231,66 @@ start:;
     }
 
     // Calculate the concentration field in solid and liqud phase
-    for (i = 0; i <= ndm; i++)
+    for (i = 0; i < ndm; i++)
     {
-        // liquid
-        if (phi[0][i] == 1.0)
+        cons[i] = (Al * con[i] + (As * cs0 - Al * cl0) * phi[1][i]) / (Al * phi[0][i] + As * phi[1][i]);
+        conl[i] = (As * con[i] + (Al * cl0 - As * cs0) * phi[0][i]) / (Al * phi[0][i] + As * phi[1][i]);
+        if (cons[i] >= 1.0)
         {
-            conp[1][i] = c1e;
-            conp[2][i] = c2e;
-            conp[0][i] = cont[i];
+            cons[i] = 1.0;
         }
-        // interface of phase 1
-        else if (phi[0][i] > 0.0 && phi[0][i] < 1.0 && phi[1][i] > 0.0 && phi[1][i] < 1.0 && phi[2][i] == 0.0)
+        if (cons[i] <= 0.0)
         {
-            conp[1][i] = c1e;
-            conp[0][i] = (cont[i] - conp[1][i] * phi[1][i]) / phi[0][i];
-            if (conp[0][i] > c01e)
-            {
-                conp[0][i] = c01e;
-            }
+            cons[i] = 0.0;
         }
-        // interface of phase 2
-        else if (phi[0][i] > 0.0 && phi[0][i] < 1.0 && phi[2][i] > 0.0 && phi[2][i] < 1.0 && phi[1][i] == 0.0)
+        if (conl[i] >= 1.0)
         {
-            conp[2][i] = c2e;
-            conp[0][i] = (cont[i] - conp[2][i] * phi[2][i]) / phi[0][i];
-            if (conp[0][i] < c02e)
-            {
-                conp[0][i] = c02e;
-            }
+            conl[i] = 1.0;
         }
-        // phase 1
-        else if (phi[1][i] == 1.0)
+        if (conl[i] <= 0.0)
         {
-            conp[1][i] = c1e;
-            conp[0][i] = c01e;
+            conl[i] = 0.0;
         }
-        // phase 2
-        else if (phi[2][i] == 1.0)
-        {
-            conp[2][i] = c2e;
-            conp[0][i] = c02e;
-        }
-        cont[i] = phi[0][i] * conp[0][i] + phi[1][i] * conp[1][i] + phi[2][i] * conp[2][i];
     }
 
     // Evolution Equation of Concentration field
-    for (i = 0; i <= ndm; i++)
+    for (i = 1; i <= ndm - 1; i++)
     {
         ip = i + 1;
         im = i - 1;
-        if (i == ndm)
-        {
-            ip = ndm;
-        }
-        if (i == 0)
-        {
-            im = 0;
-        }
         //拡散方程式内における微分計算
-
-        phis_i = phi[1][i] + phi[2][i];
-        phis_ip = phi[1][ip] + phi[2][ip];
-        phis_im = phi[1][im] + phi[2][im];
-
-        cons_i = conp[1][i] + conp[2][i];
-        cons_ip = conp[1][ip] + conp[2][ip];
-        cons_im = conp[1][im] + conp[2][im];
-
-        dev1_s = 0.25 * ((phis_ip - phis_im) * (cons_ip - cons_im)) / dx / dx;
-        dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (conp[0][ip] - conp[0][im])) / dx / dx;
-        dev2_s = phis_i * (cons_ip + cons_im - 2.0 * cons_i) / dx / dx;
-        dev2_l = phi[0][i] * (conp[0][ip] + conp[0][im] - 2.0 * conp[0][i]) / dx / dx;
+        dev1_s = 0.25 * ((phi[0][ip] - phi[0][im]) * (cons[ip] - cons[im])) / dx / dx;
+        dev1_l = 0.25 * ((phi[1][ip] - phi[1][im]) * (conl[ip] - conl[im])) / dx / dx;
+        dev2_s = phi[0][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
+        dev2_l = phi[1][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
 
         cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-        cont2[i] = cont[i] + cddtt * dtime;                      //濃度場の時間発展(陽解法)
+        con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
                                                                  // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
     }
 
     for (i = 0; i <= ndm; i++)
     {
-        cont[i] = cont2[i]; //補助配列を主配列に移動（濃度場）
+        con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
     }
 
     //*** 濃度場の収支補正 *************************************************************
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
-        sum1 += cont[i];
+        sum1 += con[i];
     }
     dc0 = sum1 / ND - c0;
     for (i = 0; i <= ndm; i++)
     {
-        cont[i] = cont[i] - dc0;
-        if (cont[i] > 1.0)
+        con[i] = con[i] - dc0;
+        if (con[i] > 1.0)
         {
-            cont[i] = 1.0;
+            con[i] = 1.0;
         }
-        if (cont[i] < 0.0)
+        if (con[i] < 0.0)
         {
-            cont[i] = 0.0;
+            con[i] = 0.0;
         }
     }
 
@@ -387,7 +313,12 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(stream, "%e   ", phi[1][i]);
+        // double iphi = 0.0;
+        // for (int k = 0; k <= nm; k++)
+        // {
+        //     iphi += phi[k][i] * phi[k][i];
+        // }
+        fprintf(stream, "%e   ", phi[0][i]);
         fprintf(stream, "\n");
     }
     fclose(stream); //ファイルをクローズ
@@ -399,8 +330,32 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamc, "%e   ", cont[i]);
+        fprintf(streamc, "%e   ", con[i]);
         fprintf(streamc, "\n");
     }
     fclose(streamc);
+
+    FILE *streamcs;
+    char buffercs[30];
+    sprintf(buffercs, "data/cons/1d%d.csv", step);
+    streamcs = fopen(buffercs, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "\n");
+    }
+    fclose(streamcs);
+
+    FILE *streamcl;
+    char buffercl[30];
+    sprintf(buffercl, "data/conl/1d%d.csv", step);
+    streamcl = fopen(buffercl, "a");
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcl, "%e   ", conl[i]);
+        fprintf(streamcl, "\n");
+    }
+    fclose(streamcl);
 }
