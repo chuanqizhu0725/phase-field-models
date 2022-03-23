@@ -1,0 +1,54 @@
+conp[1][i][j] = c1e;
+            conp[2][i][j] = c2e;
+            // phase 1
+            if (phi[1][i][j] == 1.0)
+            {
+                conp[0][i][j] = c01e;
+            }
+            // phase 2
+            else if (phi[2][i][j] == 1.0)
+            {
+                conp[0][i][j] = c02e;
+            }
+            // grain bounary
+            else if (phi[2][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[0][i][j] == 0.0)
+            {
+                conp[0][i][j] = c02e * phi[2][i][j] + c01e * phi[1][i][j];
+            }
+            // interface of phase 1
+            else if (phi[0][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[2][i][j] == 0.0)
+            {
+                conp[0][i][j] = (cont[i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
+                if (conp[0][i][j] > c01e)
+                {
+                    conp[0][i][j] = c01e;
+                }
+            }
+            // interface of phase 2
+            else if (phi[0][i][j] > 0.0 && phi[2][i][j] > 0.0 && phi[1][i][j] == 0.0)
+            {
+                conp[0][i][j] = (cont[i][j] - conp[2][i][j] * phi[2][i][j]) / phi[0][i][j];
+                if (conp[0][i][j] < c02e)
+                {
+                    conp[0][i][j] = c02e;
+                }
+            }
+            // triple junction
+            else if (phi[2][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[0][i][j] > 0.0)
+            {
+                conp[0][i][j] = (cont[i][j] - conp[2][i][j] * phi[2][i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
+                if (conp[0][i][j] > c01e)
+                {
+                    conp[0][i][j] = c01e;
+                }
+                else if (conp[0][i][j] < c02e)
+                {
+                    conp[0][i][j] = c02e;
+                }
+            }
+            // liquid
+            else if (phi[0][i][j] == 1.0)
+            {
+                conp[0][i][j] = cont[i][j];
+            }
+            cont[i][j] = phi[0][i][j] * conp[0][i][j] + phi[1][i][j] * conp[1][i][j] + phi[2][i][j] * conp[2][i][j];

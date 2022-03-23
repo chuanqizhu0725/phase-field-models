@@ -19,11 +19,11 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 
-int nstep = 401;
-int pstep = 40;
+int nstep = 4001;
+int pstep = 400;
 
 double dx = 1.0e-7;
-double dtime = 1.0e-6;
+double dtime = 7.0e-7;
 
 double gamma0 = 0.1;
 double delta = 6.0 * dx;
@@ -33,11 +33,15 @@ double mobi = 1.20951e-8;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 5.0e4;
+double F10 = 2.0e4;
+double F20 = 2.0e4;
 
-double temp = 880.0; // K
-double cl = 0.04;
+// double temp = 880.0; // K
+// double cl = 0.04;
 // double cl = 0.18;
+
+double temp = 820.0;
+double cl = 0.12;
 
 // Linear phae diagram
 double Te = 850.0;
@@ -60,8 +64,7 @@ double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][NDX][NDY], phi2[N][NDX][NDY];
 
-double phis_ij, phis_ipj, phis_imj, phis_ijp, phis_ijm;
-double cons_ij, cons_ipj, cons_imj, cons_ijp, cons_ijm;
+double cddtt, dev01, dev02, dev11, dev12, dev21, dev22;
 
 int phinum;
 int phiNum[NDX][NDY];
@@ -78,7 +81,7 @@ double termiikk, termjjkk;
 
 double dF;
 
-double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+double c0, dc0;
 
 void datasave(int step);
 
@@ -111,12 +114,16 @@ int main(void)
         }
     }
 
+    mij[1][2] = M0 * 0.05;
+    mij[2][1] = M0 * 0.05;
+
     sum1 = 0.0;
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (i <= NDX / 8)
+            // if ((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < 225)
+            if (i < NDX / 8 && j < NDY * 7 / 8)
             {
                 phi[1][i][j] = 1.0;
                 conp[1][i][j] = c1e;
@@ -124,6 +131,15 @@ int main(void)
                 conp[2][i][j] = c2e;
                 phi[0][i][j] = 0.0;
                 conp[0][i][j] = c01e;
+            }
+            else if (i < NDX / 8 && j >= NDY * 7 / 8)
+            {
+                phi[1][i][j] = 0.0;
+                conp[1][i][j] = c1e;
+                phi[2][i][j] = 1.0;
+                conp[2][i][j] = c2e;
+                phi[0][i][j] = 0.0;
+                conp[0][i][j] = c02e;
             }
             else
             {
@@ -248,21 +264,21 @@ start:;
                     }
                     if (ii == 1 && jj == 0)
                     {
-                        dF = F0 * ((conp[0][i][j] - ce) * ml1 + Te - temp);
+                        dF = F10 * ((conp[0][i][j] - ce) * ml1 + Te - temp);
                     }
                     else if (ii == 0 && jj == 1)
                     {
-                        dF = -F0 * ((conp[0][i][j] - ce) * ml1 + Te - temp);
+                        dF = -F10 * ((conp[0][i][j] - ce) * ml1 + Te - temp);
                     }
                     else if (ii == 2 && jj == 0)
                     {
-                        dF = F0 * ((conp[0][i][j] - ce) * ml2 + Te - temp);
+                        dF = F20 * ((conp[0][i][j] - ce) * ml2 + Te - temp);
                     }
                     else if (ii == 0 && jj == 2)
                     {
-                        dF = -F0 * ((conp[0][i][j] - ce) * ml2 + Te - temp);
+                        dF = -F20 * ((conp[0][i][j] - ce) * ml2 + Te - temp);
                     }
-                    else
+                    else if ((ii == 1 && jj == 2) || (ii == 1 && jj == 2))
                     {
                         dF = 0.0;
                     }
@@ -314,17 +330,26 @@ start:;
     {
         for (j = 0; j <= ndmy; j++)
         {
-            // liquid
-            if (phi[0][i][j] == 1.0)
+            conp[1][i][j] = c1e;
+            conp[2][i][j] = c2e;
+            // phase 1
+            if (phi[1][i][j] == 1.0)
             {
-                conp[1][i][j] = c1e;
-                conp[2][i][j] = c2e;
-                conp[0][i][j] = cont[i][j];
+                conp[0][i][j] = c01e;
+            }
+            // phase 2
+            else if (phi[2][i][j] == 1.0)
+            {
+                conp[0][i][j] = c02e;
+            }
+            // grain bounary
+            else if (phi[2][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[0][i][j] == 0.0)
+            {
+                conp[0][i][j] = c02e * phi[2][i][j] + c01e * phi[1][i][j];
             }
             // interface of phase 1
-            else if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0 && phi[1][i][j] > 0.0 && phi[1][i][j] < 1.0 && phi[2][i][j] == 0.0)
+            else if (phi[0][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[2][i][j] == 0.0)
             {
-                conp[1][i][j] = c1e;
                 conp[0][i][j] = (cont[i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
                 if (conp[0][i][j] > c01e)
                 {
@@ -332,26 +357,31 @@ start:;
                 }
             }
             // interface of phase 2
-            else if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0 && phi[2][i][j] > 0.0 && phi[2][i][j] < 1.0 && phi[1][i][j] == 0.0)
+            else if (phi[0][i][j] > 0.0 && phi[2][i][j] > 0.0 && phi[1][i][j] == 0.0)
             {
-                conp[2][i][j] = c2e;
                 conp[0][i][j] = (cont[i][j] - conp[2][i][j] * phi[2][i][j]) / phi[0][i][j];
                 if (conp[0][i][j] < c02e)
                 {
                     conp[0][i][j] = c02e;
                 }
             }
-            // phase 1
-            else if (phi[1][i][j] == 1.0)
+            // triple junction
+            else if (phi[2][i][j] > 0.0 && phi[1][i][j] > 0.0 && phi[0][i][j] > 0.0)
             {
-                conp[1][i][j] = c1e;
-                conp[0][i][j] = c01e;
+                conp[0][i][j] = (cont[i][j] - conp[2][i][j] * phi[2][i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
+                if (conp[0][i][j] > c01e)
+                {
+                    conp[0][i][j] = c01e;
+                }
+                else if (conp[0][i][j] < c02e)
+                {
+                    conp[0][i][j] = c02e;
+                }
             }
-            // phase 2
-            else if (phi[2][i][j] == 1.0)
+            // liquid
+            else if (phi[0][i][j] == 1.0)
             {
-                conp[2][i][j] = c2e;
-                conp[0][i][j] = c02e;
+                conp[0][i][j] = cont[i][j];
             }
             cont[i][j] = phi[0][i][j] * conp[0][i][j] + phi[1][i][j] * conp[1][i][j] + phi[2][i][j] * conp[2][i][j];
         }
@@ -382,28 +412,18 @@ start:;
             {
                 jm = ndmy;
             }
-            //拡散方程式内における微分計算
+            dev01 = 0.25 * ((phi[0][ip][j] - phi[0][im][j]) * (conp[0][ip][j] - conp[0][im][j]) + (phi[0][i][jp] - phi[0][i][jm]) * (conp[0][i][jp] - conp[0][i][jm])) / dx / dx;
+            dev02 = phi[0][i][j] * (conp[0][ip][j] + conp[0][im][j] + conp[0][i][jp] + conp[0][i][jm] - 4.0 * conp[0][i][j]) / dx / dx;
 
-            phis_ij = phi[1][i][j] + phi[2][i][j];
-            phis_ipj = phi[1][ip][j] + phi[2][ip][j];
-            phis_imj = phi[1][im][j] + phi[2][im][j];
-            phis_ijp = phi[1][i][jp] + phi[2][i][jp];
-            phis_ijm = phi[1][i][jm] + phi[2][i][jm];
+            dev11 = 0.25 * ((phi[1][ip][j] - phi[1][im][j]) * (conp[1][ip][j] - conp[1][im][j]) + (phi[1][i][jp] - phi[1][i][jm]) * (conp[1][i][jp] - conp[1][i][jm])) / dx / dx;
+            dev12 = phi[1][i][j] * (conp[1][ip][j] + conp[1][im][j] + conp[1][i][jp] + conp[1][i][jm] - 4.0 * conp[1][i][j]) / dx / dx;
 
-            cons_ij = conp[1][i][j] + conp[2][i][j];
-            cons_ipj = conp[1][ip][j] + conp[2][ip][j];
-            cons_imj = conp[1][im][j] + conp[2][im][j];
-            cons_ijp = conp[1][i][jp] + conp[2][i][jp];
-            cons_ijm = conp[1][i][jm] + conp[2][i][jm];
+            dev21 = 0.25 * ((phi[2][ip][j] - phi[2][im][j]) * (conp[2][ip][j] - conp[2][im][j]) + (phi[2][i][jp] - phi[2][i][jm]) * (conp[2][i][jp] - conp[2][i][jm])) / dx / dx;
+            dev22 = phi[2][i][j] * (conp[2][ip][j] + conp[2][im][j] + conp[2][i][jp] + conp[2][i][jm] - 4.0 * conp[2][i][j]) / dx / dx;
 
-            dev1_s = 0.25 * ((phis_ipj - phis_imj) * (cons_ipj - cons_imj) + (phis_ijp - phis_ijm) * (cons_ijp - cons_ijm)) / dx / dx;
-            dev1_l = 0.25 * ((phi[0][ip][j] - phi[0][im][j]) * (conp[0][ip][j] - conp[0][im][j]) + (phi[0][i][jp] - phi[0][i][jm]) * (conp[0][i][jp] - conp[0][i][jm])) / dx / dx;
-            dev2_s = phis_ij * (cons_ipj + cons_imj + cons_ijp + cons_ijm - 4.0 * cons_ij) / dx / dx;
-            dev2_l = phi[0][i][j] * (conp[0][ip][j] + conp[0][im][j] + conp[0][i][jp] + conp[0][i][jm] - 4.0 * conp[0][i][j]) / dx / dx;
-
-            cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-            cont2[i][j] = cont[i][j] + cddtt * dtime;                //濃度場の時間発展(陽解法)
-                                                                     // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+            cddtt = Ds * (dev11 + dev12) + Ds * (dev21 + dev22) + Dl * (dev01 + dev02);
+            cont2[i][j] = cont[i][j] + cddtt * dtime; //濃度場の時間発展(陽解法)
+                                                      // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
         }
     }
 
