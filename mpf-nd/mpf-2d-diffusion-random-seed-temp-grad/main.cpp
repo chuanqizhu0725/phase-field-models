@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define N 11
+#define N 9
 #define NDX 64
 #define NDY 64
 #define PI 3.14159
@@ -94,6 +94,7 @@ int main(void)
         for (j = 0; j <= ndmy; j++)
         {
             temp[i][j] = -1.0 * (ndmx - i) / ndmx;
+            // temp[i][j] = -1.0;
         }
     }
 
@@ -113,7 +114,6 @@ int main(void)
             }
         }
     }
-    srand(3.0);
     r0 = 6.0;
     for (ii = 1; ii <= nm; ii++)
     {
@@ -251,8 +251,6 @@ start:;
             {
                 jm = ndmy;
             }
-            c01e = calC01e(temp[i][j]);
-            c02e = calC02e(temp[i][j]);
             for (n1 = 1; n1 <= phiNum[i][j]; n1++)
             {
                 ii = phiIdx[n1][i][j];
@@ -342,6 +340,10 @@ start:;
     {
         for (j = 0; j <= ndmy; j++)
         {
+            c1e = calC1e(temp[i][j]);
+            c2e = calC2e(temp[i][j]);
+            c01e = calC01e(temp[i][j]);
+            c02e = calC02e(temp[i][j]);
             for (kk = 1; kk <= nm; kk++)
             {
                 if (kk % 2 == 1)
@@ -571,7 +573,7 @@ double calDF20(double con0, double temp0)
 {
     double Te = 0.0;
     double ce = 0.5;
-    double ml2 = -20.0;
+    double ml2 = 10.0;
     double DF = ((con0 - ce) * ml2 + Te - temp0) * 0.5;
     return DF;
 }
