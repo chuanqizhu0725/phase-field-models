@@ -93,8 +93,9 @@ int main(void)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            temp[i][j] = -1.0 * (ndmx - i) / ndmx;
             // temp[i][j] = -1.0;
+            temp[i][j] = -1.0 * (1.0 - (double(i) / double(ndmx / 2)));
+            // temp[i][j] = 1.0 - double(i) / double(ndmx);
         }
     }
 
@@ -370,7 +371,7 @@ start:;
                     }
                 }
             }
-            else if (phi[0][i][j] > 0.0)
+            else if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0)
             {
                 sum1 = cont[i][j];
                 for (kk = 1; kk <= nm; kk++)
@@ -387,6 +388,10 @@ start:;
                 {
                     conp[0][i][j] = c02e;
                 }
+            }
+            else if (phi[0][i][j] == 1.0)
+            {
+                conp[0][i][j] = cont[i][j];
             }
             cont[i][j] = 0.0;
             for (kk = 0; kk <= nm; kk++)
