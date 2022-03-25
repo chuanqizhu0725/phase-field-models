@@ -19,7 +19,7 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
-int nstep = 50001;
+int nstep = 20001;
 int pstep = 2000;
 
 double dx = 1.0;
@@ -62,7 +62,7 @@ double dF, pddtt, sum1, sums, suml;
 double termiikk, termjjkk;
 double phidxx, phidyy;
 
-int intpos, isSolid, dist;
+int intpos, allSolid, allLiquid, dist;
 
 void datasave(int step);
 double calC01e(double temp0), calC1e(double temp0), calC02e(double temp0), calC2e(double temp0);
@@ -187,7 +187,7 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps have passed!" << endl;
-        cout << "The interface postion is " << intpos << endl;
+        cout << "The interface postion is " << dist << endl;
     }
 
     for (i = 0; i <= ndmx; i++)
@@ -491,20 +491,39 @@ start:;
     // moving frame
     for (i = 0; i <= ndmx; i++)
     {
-        isSolid = 1;
+        allSolid = 1;
         for (j = 0; j <= ndmy; j++)
         {
             if (phi[0][i][j] == 1.0)
             {
-                isSolid = 0;
+                allSolid = 0;
+                break;
             }
         }
-        if (isSolid == 1)
+        if (allSolid == 1)
         {
             intpos = i;
         }
         else
         {
+            break;
+        }
+    }
+
+    for (i = intpos; i <= ndmx; i++)
+    {
+        allLiquid = 1;
+        for (j = 0; j <= ndmy; j++)
+        {
+            if (phi[0][i][j] < 1.0)
+            {
+                allLiquid = 0;
+                break;
+            }
+        }
+        if (allLiquid == 1)
+        {
+            intpos = i;
             break;
         }
     }
@@ -519,6 +538,7 @@ start:;
     }
     if (dist > 0)
     {
+        cout << dist << endl;
         for (i = 0; i <= (ndmx - dist); i++)
         {
             for (j = 0; j <= ndmy; j++)

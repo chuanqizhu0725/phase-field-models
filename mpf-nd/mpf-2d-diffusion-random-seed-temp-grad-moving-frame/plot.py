@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 ns = 2000
 nx = 64
 ny = 64
-step_arr = np.arange(0, ns*26, ns)
+step_arr = np.arange(0, ns*101, ns)
 for step in step_arr:
     df = pd.read_csv(f"data/phi/2d{step}.csv", header=None)
     arr = df[0].values
