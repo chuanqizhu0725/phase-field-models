@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define N 9
+#define N 3
 #define NDX 64
 #define NDY 64
 #define PI 3.14159
@@ -19,11 +19,13 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
-int nstep = 20001;
-int pstep = 2000;
+int nstep = 6001;
+int pstep = 400;
+
+double DT = 0.0;
 
 double dx = 1.0;
-double dtime = 0.02;
+double dtime = 0.01;
 double gamma0 = 0.5;
 double mobi = 1.0;
 double delta = 5.0 * dx;
@@ -35,7 +37,7 @@ double F0 = 0.5;
 
 double Dl = 5.0;
 double Ds = 0.01;
-// double cl = 0.15;
+// double cl = 0.2;
 double cl = 0.5;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
@@ -49,7 +51,7 @@ int phiNum[NDX][NDY];
 int phiIdx[N + 1][NDX][NDY];
 
 double c1e, c01e, c2e, c02e;
-double c0, dc0, cddtt, dev01, dev02, dev11, dev12, dev21, dev22;
+double c0, dc0, cddtt, dev01, dev02, dev11, dev12, dev21, dev22, lcount, cm0, dcm0;
 
 int i, j, im, ip, jm, jp, k;
 int ii, jj, kk;
@@ -96,7 +98,8 @@ int main(void)
         for (j = 0; j <= ndmy; j++)
         {
             // temp[i][j] = -1.0 * (1.0 - (double(i) / double(ndmx / 2)));
-            temp[i][j] = -1.0 + i * 0.04;
+            // temp[i][j] = -1.0 + i * 0.02;
+            temp[i][j] = -1.0;
         }
     }
 
@@ -116,10 +119,10 @@ int main(void)
             }
         }
     }
-    r0 = 4.0;
+    r0 = 10.0;
     for (ii = 1; ii <= nm; ii++)
     {
-        x00 = rand() % NDX;
+        x00 = rand() % (NDX / 2);
         y00 = rand() % NDY;
         for (i = 0; i <= ndmx; i++)
         {
@@ -180,6 +183,7 @@ int main(void)
         }
     }
     c0 = sum1 / NDX / NDY;
+    cm0 = sum1;
 
 start:;
 
@@ -187,7 +191,8 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps have passed!" << endl;
-        cout << "The interface postion is " << dist << endl;
+        // cout << "The interface postion is " << intpo << endl;
+        cout << "The nominal concnetration is " << c0 << endl;
     }
 
     for (i = 0; i <= ndmx; i++)
@@ -381,14 +386,13 @@ start:;
                     sum1 -= phi[kk][i][j] * conp[kk][i][j];
                 }
                 conp[0][i][j] = sum1 / phi[0][i][j];
-
-                if (conp[0][i][j] >= c01e)
+                if (conp[0][i][j] > 1.0)
                 {
-                    conp[0][i][j] = c01e;
+                    conp[0][i][j] = 1.0;
                 }
-                else if (conp[0][i][j] <= c02e)
+                if (conp[0][i][j] < 0.0)
                 {
-                    conp[0][i][j] = c02e;
+                    conp[0][i][j] = 0.0;
                 }
             }
             else if (phi[0][i][j] == 1.0)
@@ -399,6 +403,14 @@ start:;
             for (kk = 0; kk <= nm; kk++)
             {
                 cont[i][j] += conp[kk][i][j] * phi[kk][i][j];
+            }
+            if (cont[i][j] > 1.0)
+            {
+                cont[i][j] = 1.0;
+            }
+            if (cont[i][j] < 0.0)
+            {
+                cont[i][j] = 0.0;
             }
         }
     }
@@ -462,19 +474,37 @@ start:;
             sum1 += cont[i][j];
         }
     }
-    dc0 = sum1 / NDX / NDY - c0;
+    c0 = sum1 / NDX / NDY;
+    dcm0 = sum1 - cm0;
+    lcount = 0.0;
+    // collect mass in  liquid
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            cont[i][j] = cont[i][j] - dc0;
-            if (cont[i][j] > 1.0)
+            if (phi[0][i][j] > 0.0)
             {
-                cont[i][j] = 1.0;
+                lcount += phi[0][i][j];
             }
-            if (cont[i][j] < 0.0)
+        }
+    }
+    // correction for mass conservation
+    for (i = 0; i <= ndmx; i++)
+    {
+        for (j = 0; j <= ndmy; j++)
+        {
+            if (phi[0][i][j] > 0.0)
             {
-                cont[i][j] = 0.0;
+                conp[0][i][j] = conp[0][i][j] - dcm0 / lcount * phi[0][i][j];
+                cont[i][j] = cont[i][j] - dcm0 / lcount * phi[0][i][j];
+                if (conp[0][i][j] > 1.0)
+                {
+                    conp[0][i][j] = 1.0;
+                }
+                if (conp[0][i][j] < 0.0)
+                {
+                    conp[0][i][j] = 0.0;
+                }
             }
         }
     }
@@ -484,93 +514,93 @@ start:;
     {
         for (j = 0; j <= ndmy; j++)
         {
-            temp[i][j] -= 1.5 / double(nstep);
+            temp[i][j] -= DT / 20000.0;
         }
     }
 
     // moving frame
-    for (i = 0; i <= ndmx; i++)
-    {
-        allSolid = 1;
-        for (j = 0; j <= ndmy; j++)
-        {
-            if (phi[0][i][j] == 1.0)
-            {
-                allSolid = 0;
-                break;
-            }
-        }
-        if (allSolid == 1)
-        {
-            intpos = i;
-        }
-        else
-        {
-            break;
-        }
-    }
+    // for (i = 0; i <= ndmx; i++)
+    // {
+    //     allSolid = 1;
+    //     for (j = 0; j <= ndmy; j++)
+    //     {
+    //         if (phi[0][i][j] == 1.0)
+    //         {
+    //             allSolid = 0;
+    //             break;
+    //         }
+    //     }
+    //     if (allSolid == 1)
+    //     {
+    //         intpos = i;
+    //     }
+    //     else
+    //     {
+    //         break;
+    //     }
+    // }
 
-    for (i = intpos; i <= ndmx; i++)
-    {
-        allLiquid = 1;
-        for (j = 0; j <= ndmy; j++)
-        {
-            if (phi[0][i][j] < 1.0)
-            {
-                allLiquid = 0;
-                break;
-            }
-        }
-        if (allLiquid == 1)
-        {
-            intpos = i;
-            break;
-        }
-    }
+    // for (i = intpos; i <= ndmx; i++)
+    // {
+    //     allLiquid = 1;
+    //     for (j = 0; j <= ndmy; j++)
+    //     {
+    //         if (phi[0][i][j] < 1.0)
+    //         {
+    //             allLiquid = 0;
+    //             break;
+    //         }
+    //     }
+    //     if (allLiquid == 1)
+    //     {
+    //         intpos = i;
+    //         break;
+    //     }
+    // }
 
-    if (intpos > NDX / 2)
-    {
-        dist = intpos - NDX / 2;
-    }
-    else
-    {
-        dist = 0;
-    }
-    if (dist > 0)
-    {
-        cout << dist << endl;
-        for (i = 0; i <= (ndmx - dist); i++)
-        {
-            for (j = 0; j <= ndmy; j++)
-            {
-                for (kk = 0; kk <= nm; kk++)
-                {
-                    phi[kk][i][j] = phi2[kk][i + dist][j];
-                    conp[kk][i][j] = conp[kk][i + dist][j];
-                    cont[i][j] = cont[i + dist][j];
-                }
-                temp[i][j] = temp[i + dist][j];
-            }
-        }
+    // if (intpos > NDX / 2)
+    // {
+    //     dist = intpos - NDX / 2;
+    // }
+    // else
+    // {
+    //     dist = 0;
+    // }
+    // if (dist > 0)
+    // {
+    //     cout << dist << endl;
+    //     for (i = 0; i <= (ndmx - dist); i++)
+    //     {
+    //         for (j = 0; j <= ndmy; j++)
+    //         {
+    //             for (kk = 0; kk <= nm; kk++)
+    //             {
+    //                 phi[kk][i][j] = phi2[kk][i + dist][j];
+    //                 conp[kk][i][j] = conp[kk][i + dist][j];
+    //                 cont[i][j] = cont[i + dist][j];
+    //             }
+    //             temp[i][j] = temp[i + dist][j];
+    //         }
+    //     }
 
-        for (i = (ndmx - dist + 1); i <= ndmx; i++)
-        {
-            for (j = 0; j <= ndmy; j++)
-            {
-                c1e = calC1e(temp[i][j]);
-                c2e = calC2e(temp[i][j]);
-                for (kk = 1; kk <= nm; kk++)
-                {
-                    phi[kk][i][j] = 0.0;
-                    conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
-                }
-                phi[0][i][j] = 1.0;
-                conp[0][i][j] = cont[ndmx - dist][j];
-                cont[i][j] = conp[0][i][j];
-                temp[i][j] = temp[ndmx - dist][j] + 0.04 * (i - ndmx + dist);
-            }
-        }
-    }
+    //     for (i = (ndmx - dist + 1); i <= ndmx; i++)
+    //     {
+    //         for (j = 0; j <= ndmy; j++)
+    //         {
+    //             c1e = calC1e(temp[i][j]);
+    //             c2e = calC2e(temp[i][j]);
+    //             for (kk = 1; kk <= nm; kk++)
+    //             {
+    //                 phi[kk][i][j] = 0.0;
+    //                 conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
+    //             }
+    //             phi[0][i][j] = 1.0;
+    //             conp[0][i][j] = cont[ndmx - dist][j];
+    //             cont[i][j] = conp[0][i][j];
+    //             temp[i][j] = temp[ndmx - dist][j] + 0.04 * (i - ndmx + dist);
+    //         }
+    //     }
+    // }
 
     istep = istep + 1;
     if (istep < nstep)
