@@ -17,25 +17,25 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 1001;
-int pstep = 200;
+int nstep = 8001;
+int pstep = 800;
 
 double dx = 1.0;
 double dtime = 0.05;
 double gamma0 = 0.5;
 double mobi = 1.0;
-double delta = 7.0 * dx;
+double delta = 10.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double S0 = 0.8;
+double S0 = 0.5;
 
 double Dl = 5.0;
 double Ds = 0.01;
 
 double temp = 2.0;
-double cl = 0.15;
+double cl = 0.3;
 
 // Linear phae diagram
 double Te = 0.0;
@@ -60,6 +60,7 @@ int phiNum[ND];
 int phiIdx[N + 1][ND];
 
 double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+double cm0, dcm0, icount;
 
 int i, j, im, ip, k;
 int ii, jj, kk;
@@ -115,6 +116,7 @@ int main(void)
         sum1 += con[i];
     }
     c0 = sum1 / ND;
+    cm0 = sum1;
 
 start:;
 
@@ -122,6 +124,7 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
+        cout << "The nominal concnetration is " << c0 << endl;
     }
 
     for (i = 0; i <= ndm; i++)
@@ -241,13 +244,27 @@ start:;
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
             conl[i] = (con[i] - cons[i] * phi[1][i]) / phi[0][i];
-            if (conl[i] > c01e)
+            if (c01e >= c0)
             {
-                conl[i] = c01e;
+                if (conl[i] > c01e)
+                {
+                    conl[i] = c01e;
+                }
+                if (conl[i] < c0)
+                {
+                    conl[i] = c0;
+                }
             }
-            else if (conl[i] < cl)
+            else if (c01e < c0)
             {
-                conl[i] = cl;
+                if (conl[i] < c01e)
+                {
+                    conl[i] = c01e;
+                }
+                if (conl[i] > c0)
+                {
+                    conl[i] = c0;
+                }
             }
         }
         else if (phi[0][i] == 1.0)
@@ -292,19 +309,45 @@ start:;
     {
         sum1 += con[i];
     }
-    dc0 = sum1 / ND - c0;
+    c0 = sum1 / ND;
+    dcm0 = sum1 - cm0;
+    icount = 0.0;
     for (i = 0; i <= ndm; i++)
     {
-        con[i] = con[i] - dc0;
-        if (con[i] > 1.0)
+        if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
-            con[i] = 1.0;
-        }
-        if (con[i] < 0.0)
-        {
-            con[i] = 0.0;
+            icount += 1.0;
         }
     }
+    for (i = 0; i <= ndm; i++)
+    {
+        if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
+        {
+            con[i] = con[i] - dcm0 / icount;
+            if (con[i] > 1.0)
+            {
+                con[i] = 1.0;
+            }
+            if (con[i] < 0.0)
+            {
+                con[i] = 0.0;
+            }
+        }
+    }
+
+    // dc0 = sum1 / ND - c0;
+    // for (i = 0; i <= ndm; i++)
+    // {
+    //     con[i] = con[i] - dc0;
+    //     if (con[i] > 1.0)
+    //     {
+    //         con[i] = 1.0;
+    //     }
+    //     if (con[i] < 0.0)
+    //     {
+    //         con[i] = 0.0;
+    //     }
+    // }
 
     istep = istep + 1;
     if (istep < nstep)
@@ -354,4 +397,16 @@ void datasave(int step)
         fprintf(streamcl, "\n");
     }
     fclose(streamcl); //ファイルをクローズ
+
+    FILE *streamcs; //ストリームのポインタ設定
+    char buffercs[30];
+    sprintf(buffercs, "data/cons/1d%d.csv", step);
+    streamcs = fopen(buffercs, "a"); //書き込む先のファイルを追記方式でオープン
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "\n");
+    }
+    fclose(streamcs); //ファイルをクローズ
 }
