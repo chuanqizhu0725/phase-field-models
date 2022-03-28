@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define N 2
+#define N 3
 #define NDX 64
 #define NDY 64
 #define PI 3.14159
@@ -19,7 +19,7 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
-int nstep = 25601;
+int nstep = 6401;
 int pstep = 800;
 
 double dx = 1.0;
@@ -36,8 +36,8 @@ double S0 = 0.5;
 double Dl = 5.0;
 double Ds = 0.01;
 
-double temp = 2.0;
-double cl = 0.3;
+double temp = -1.0;
+double cl = 0.5;
 
 // Linear phae diagram
 double Te = 0.0;
@@ -115,7 +115,7 @@ int main(void)
         }
     }
 
-    r0 = 20.0;
+    r0 = 5.0;
     for (ii = 1; ii <= nm; ii++)
     {
         x00 = rand() % NDX;
@@ -340,14 +340,15 @@ start:;
         for (j = 0; j <= ndmy; j++)
         {
             conp[1][i][j] = c1e;
+            conp[2][i][j] = c2e;
             if (phi[0][i][j] == 0.0)
             {
 
-                conp[0][i][j] = c01e;
+                conp[0][i][j] = c01e * phi[1][i][j] + c02e * phi[2][i][j];
             }
             else if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0)
             {
-                conp[0][i][j] = (cont[i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
+                conp[0][i][j] = (cont[i][j] - conp[1][i][j] * phi[1][i][j] - conp[2][i][j] * phi[2][i][j]) / phi[0][i][j];
                 if (conp[0][i][j] > 1.0)
                 {
                     conp[0][i][j] = 1.0;
@@ -361,7 +362,7 @@ start:;
             {
                 conp[0][i][j] = cont[i][j];
             }
-            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[0][i][j] * phi[0][i][j];
+            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[2][i][j] * phi[2][i][j] + conp[0][i][j] * phi[0][i][j];
             if (cont[i][j] > 1.0)
             {
                 cont[i][j] = 1.0;
@@ -432,15 +433,15 @@ start:;
     c0 = sum1 / NDX / NDY;
     dcm0 = sum1 - cm0;
     icount = 0.0;
-    sum1 = 0.0;
-    // collect mass in interface and liquid
+
+    // collect mass in  liquid
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0)
+            if (phi[0][i][j] > 0.0)
             {
-                icount += 1.0;
+                lcount += 1.0;
             }
         }
     }
@@ -449,16 +450,16 @@ start:;
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (phi[0][i][j] > 0.0 && phi[0][i][j] < 1.0)
+            if (phi[0][i][j] > 0.0)
             {
-                cont[i][j] = cont[i][j] - dcm0 / icount;
-                if (cont[i][j] > 1.0)
+                conp[0][i][j] = conp[0][i][j] - dcm0 / lcount;
+                if (conp[0][i][j] > 1.0)
                 {
-                    cont[i][j] = 1.0;
+                    conp[0][i][j] = 1.0;
                 }
-                if (cont[i][j] < 0.0)
+                if (conp[0][i][j] < 0.0)
                 {
-                    cont[i][j] = 0.0;
+                    conp[0][i][j] = 0.0;
                 }
             }
         }
