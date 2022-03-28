@@ -17,14 +17,14 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 8001;
+int nstep = 64001;
 int pstep = 800;
 
 double dx = 1.0;
-double dtime = 0.05;
+double dtime = 0.02;
 double gamma0 = 0.5;
 double mobi = 1.0;
-double delta = 10.0 * dx;
+double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
@@ -35,7 +35,7 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double temp = 2.0;
-double cl = 0.3;
+double cl = 0.4;
 
 // Linear phae diagram
 double Te = 0.0;
@@ -60,7 +60,7 @@ int phiNum[ND];
 int phiIdx[N + 1][ND];
 
 double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
-double cm0, dcm0, icount;
+double cm0, dcm0, icount, lcount;
 
 int i, j, im, ip, k;
 int ii, jj, kk;
@@ -98,7 +98,7 @@ int main(void)
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
-        if (i <= ND / 8)
+        if (i <= ND / 2)
         {
             phi[1][i] = 1.0;
             cons[i] = c1e;
@@ -244,26 +244,27 @@ start:;
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
             conl[i] = (con[i] - cons[i] * phi[1][i]) / phi[0][i];
-            if (c01e >= c0)
+            // correction for abnomal calculation
+            if (c01e >= cl)
             {
                 if (conl[i] > c01e)
                 {
                     conl[i] = c01e;
                 }
-                if (conl[i] < c0)
+                else if (conl[i] < cl)
                 {
-                    conl[i] = c0;
+                    conl[i] = cl;
                 }
             }
-            else if (c01e < c0)
+            if (c01e < cl)
             {
                 if (conl[i] < c01e)
                 {
                     conl[i] = c01e;
                 }
-                if (conl[i] > c0)
+                else if (conl[i] > cl)
                 {
-                    conl[i] = c0;
+                    conl[i] = cl;
                 }
             }
         }
@@ -303,8 +304,7 @@ start:;
         con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
     }
 
-    //*** 濃度場の収支補正 *************************************************************
-    sum1 = 0.0;
+        sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
         sum1 += con[i];
@@ -312,13 +312,23 @@ start:;
     c0 = sum1 / ND;
     dcm0 = sum1 - cm0;
     icount = 0.0;
+    sum1 = 0.0;
+    lcount = 0.0;
+    // collect mass in interface and liquid
     for (i = 0; i <= ndm; i++)
     {
         if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
             icount += 1.0;
         }
+        if (phi[0][i] == 1.0)
+        {
+            sum1 += con[i];
+            lcount += 1.0;
+        }
     }
+    cl = sum1 / lcount;
+    // correction for mass conservation
     for (i = 0; i <= ndm; i++)
     {
         if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
@@ -334,20 +344,6 @@ start:;
             }
         }
     }
-
-    // dc0 = sum1 / ND - c0;
-    // for (i = 0; i <= ndm; i++)
-    // {
-    //     con[i] = con[i] - dc0;
-    //     if (con[i] > 1.0)
-    //     {
-    //         con[i] = 1.0;
-    //     }
-    //     if (con[i] < 0.0)
-    //     {
-    //         con[i] = 0.0;
-    //     }
-    // }
 
     istep = istep + 1;
     if (istep < nstep)
