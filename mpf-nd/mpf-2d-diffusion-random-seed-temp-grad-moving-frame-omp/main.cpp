@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define N 2
+#define N 3
 #define NDX 64
 #define NDY 64
 #define PI 3.14159
@@ -37,10 +37,10 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double DT = 0.0;
-double temp0 = 2.0;
+double temp0 = -1.0;
 double gradT = 0.00;
-double cl = 0.2;
-// double cl = 0.5;
+// double cl = 0.2;
+double cl = 0.5;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
@@ -191,6 +191,11 @@ int main(void)
 
 start:;
 
+    for (i = 0; i <= nm; i++)
+    {
+        Nc[i] = N;
+    }
+
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
@@ -225,6 +230,10 @@ start:;
                     phinum++;
                     phiIdx[phinum][i][j] = ii;
                 }
+                if (Nc[ii] == N)
+                {
+                    Nc[ii] = ii;
+                }
             }
             phiNum[i][j] = phinum;
         }
@@ -238,6 +247,10 @@ start:;
         cout << "The nominal concnetration is " << c0 << endl;
 
         // remove redundant memroy of phase and con fields
+        for (i = 0; i <= nm; i++)
+        {
+            cout << "phase " << Nc[i] << endl;
+        }
     }
 
     // Calculate the concentration field in solid and liqud phase
