@@ -18,8 +18,8 @@ int nm = N - 1;
 int ndm = ND - 1;
 int rows = ND / NTH;
 
-int nstep = 12801;
-int pstep = 200;
+int nstep = 102401;
+int pstep = 1600;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -35,7 +35,7 @@ double S0 = 0.5;
 double Dl = 5.0;
 double Ds = 0.01;
 
-double temp0 = 1.0;
+double temp0 = 2.0;
 double gradT = 0.01;
 double cl = 0.2;
 
@@ -54,8 +54,9 @@ int main(void)
 {
 
     int i, j, k, im, ip, jm, jp, km, kp;
-    int ni, phinum0;
-    double c0, cm0, sum0, lcount, dcm0;
+    int ni, phinum0, fcount;
+    double c0, dc0, sum0;
+    fcount = 0;
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
@@ -106,8 +107,6 @@ int main(void)
         sum0 += cont[i];
     }
     c0 = sum0 / ND;
-    cm0 = sum0;
-
     for (i = 0; i <= ndm; i++)
     {
         ip = i + 1;
@@ -164,7 +163,6 @@ int main(void)
             cout << "The nominal concnetration is " << c0 << endl;
         }
 
-#pragma omp barrier
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
         for (ix = start; ix <= end; ix++)
         {
@@ -244,6 +242,7 @@ int main(void)
                 phi[kk][ix] = phi[kk][ix] / psum;
             }
         }
+#pragma omp barrier
         // ---------------------------  Collect information of phase fields ----------------------------------
         for (ix = start; ix <= end; ix++)
         {
@@ -278,10 +277,14 @@ int main(void)
             {
                 conp[0][ix] = calC01e(temp[ix]);
             }
-            else if (phi[0][ix] > 0.0)
+            else if (phi[0][ix] > 0.0 && phi[0][ix] < 1.0)
             {
                 conp[1][ix] = calC1e(temp[ix]);
                 conp[0][ix] = (cont[ix] - conp[1][ix] * phi[1][ix]) / phi[0][ix];
+                // if (conp[0][ix] > calC01e(temp[ix]))
+                // {
+                //     conp[0][ix] = calC01e(temp[ix]);
+                // }
                 if (conp[0][ix] > 1.0)
                 {
                     conp[0][ix] = 1.0;
@@ -290,6 +293,10 @@ int main(void)
                 {
                     conp[0][ix] = 0.0;
                 }
+            }
+            else if (phi[0][ix] == 1.0)
+            {
+                conp[0][ix] = cont[ix];
             }
             cont[ix] = conp[1][ix] * phi[1][ix] + conp[0][ix] * phi[0][ix];
             if (cont[ix] > 1.0)
@@ -301,34 +308,21 @@ int main(void)
                 cont[ix] = 0.0;
             }
         }
-
         // --------------------- Correct concentration in liquid phase for mass conservation --------------------------
-
-        if (th_id == 0)
-        {
-            sum0 = 0.0;
-            lcount = 0.0;
-        }
+        fcount += 1;
 #pragma omp barrier
-        // collect mass in liquid
-        for (ix = start; ix <= end; ix++)
+        // collect mass
+        if (fcount = NTH && th_id == 0)
         {
-            if (phi[0][ix] == 1.0)
+            for (ix = 0; ix <= ndm; ix++)
             {
                 sum0 += cont[ix];
-                lcount += phi[0][ix];
             }
-        }
-        c0 = sum0 / ND;
-        dcm0 = sum0 - cm0;
-#pragma omp barrier
-        // correction for mass conservation
-        for (ix = start; ix <= end; ix++)
-        {
-            if (phi[0][ix] == 1.0)
+            dc0 = sum0 / ND - c0;
+            // correction for mass conservation
+            for (ix = 0; ix <= ndm; ix++)
             {
-                conp[0][ix] = conp[0][ix] - dcm0 / lcount;
-                cont[ix] = cont[ix] - dcm0 / lcount;
+                cont[ix] = cont[ix] - dc0;
                 if (cont[ix] > 1.0)
                 {
                     cont[ix] = 1.0;
@@ -337,15 +331,9 @@ int main(void)
                 {
                     cont[ix] = 0.0;
                 }
-                if (conp[0][ix] > 1.0)
-                {
-                    conp[0][ix] = 1.0;
-                }
-                if (conp[0][ix] < 0.0)
-                {
-                    conp[0][ix] = 0.0;
-                }
             }
+            fcount = 0;
+            sum0 = 0.0;
         }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------
