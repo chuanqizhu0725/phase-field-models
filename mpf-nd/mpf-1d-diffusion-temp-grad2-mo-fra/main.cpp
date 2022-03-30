@@ -1,19 +1,17 @@
 
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include <iostream>
 #include <string>
-#include <fstream>
-#include <sstream>
 #include <omp.h>
 
 using namespace std;
 
 #define N 3
 #define ND 100
-#define NTH 1
+#define NTH 5
 #define PI 3.14159
 
 int nm = N - 1;
@@ -132,7 +130,7 @@ int main(void)
 
         // ---------------------------------  Output the calculation data  ------------------------------------
 
-        if (istep % pstep == 0)
+        if ((istep % pstep == 0) && (th_id == 0))
         {
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
@@ -140,7 +138,7 @@ int main(void)
         }
 
         // ---------------------------------  Collect information of phase fields ------------------------------------
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             ixp = ix + 1;
             ixm = ix - 1;
@@ -165,9 +163,9 @@ int main(void)
             }
             phiNum[ix] = phinum;
         }
-
+#pragma omp barrier
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             ixp = ix + 1;
             ixm = ix - 1;
@@ -224,7 +222,7 @@ int main(void)
             }
         } // ix
 
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             for (kk = 0; kk <= nm; kk++)
             {
@@ -233,7 +231,7 @@ int main(void)
         }
 
         //
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             psum = 0.0;
             for (kk = 0; kk <= nm; kk++)
@@ -245,8 +243,9 @@ int main(void)
                 phi[kk][ix] = phi[kk][ix] / psum;
             }
         }
+#pragma omp barrier
         // --------------------- Calculate concentration in the interface and liquid phase --------------------------
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             if (phi[0][ix] == 0.0)
             {
@@ -277,47 +276,54 @@ int main(void)
         }
 
         // --------------------- Correct concentration in liquid phase for mass conservation --------------------------
-        sum0 = 0.0;
-        lcount = 0.0;
-        // collect mass in liquid
-        for (ix = 0; ix <= ndm; ix++)
-        {
-            if (phi[0][ix] == 1.0)
-            {
-                sum0 += con[ix];
-                lcount += phi[0][ix];
-            }
-        }
-        c0 = sum0 / ND;
-        dcm0 = sum0 - cm0;
-        // correction for mass conservation
-        for (ix = 0; ix <= ndm; ix++)
-        {
-            if (phi[0][ix] == 1.0)
-            {
-                conl[ix] = conl[ix] - dcm0 / lcount;
-                con[ix] = con[ix] - dcm0 / lcount;
-                if (con[ix] > 1.0)
-                {
-                    con[ix] = 1.0;
-                }
-                if (con[ix] < 0.0)
-                {
-                    con[ix] = 0.0;
-                }
-                if (conl[ix] > 1.0)
-                {
-                    conl[ix] = 1.0;
-                }
-                if (conl[ix] < 0.0)
-                {
-                    conl[ix] = 0.0;
-                }
-            }
-        }
 
+        if (th_id == 0)
+        {
+            sum0 = 0.0;
+            lcount = 0.0;
+            // collect mass in liquid
+            for (ix = 0; ix <= ndm; ix++)
+            {
+                if (phi[0][ix] == 1.0)
+                {
+                    sum0 += con[ix];
+                    lcount += phi[0][ix];
+                }
+            }
+            c0 = sum0 / ND;
+            dcm0 = sum0 - cm0;
+            // correction for mass conservation
+            for (ix = 0; ix <= ndm; ix++)
+            {
+                if (phi[0][ix] == 1.0)
+                {
+                    conl[ix] = conl[ix] - dcm0 / lcount;
+                    con[ix] = con[ix] - dcm0 / lcount;
+                    if (con[ix] > 1.0)
+                    {
+                        con[ix] = 1.0;
+                    }
+                    if (con[ix] < 0.0)
+                    {
+                        con[ix] = 0.0;
+                    }
+                    if (conl[ix] > 1.0)
+                    {
+                        conl[ix] = 1.0;
+                    }
+                    if (conl[ix] < 0.0)
+                    {
+                        conl[ix] = 0.0;
+                    }
+                }
+            }
+
+            sum0 = 0.0;
+            lcount = 0.0;
+        }
+#pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             ixp = ix + 1;
             ixm = ix - 1;
@@ -340,10 +346,11 @@ int main(void)
                                                                      // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
         }
 
-        for (ix = 0; ix <= ndm; ix++)
+        for (ix = start; ix <= end; ix++)
         {
             con[ix] = con2[ix];
         }
+#pragma omp barrier
 
         // moving frame
 
