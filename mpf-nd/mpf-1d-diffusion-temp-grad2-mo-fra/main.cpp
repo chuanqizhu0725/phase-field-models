@@ -10,16 +10,16 @@
 using namespace std;
 
 #define N 3
-#define ND 100
-#define NTH 5
+#define ND 128
+#define NTH 8
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 int rows = ND / NTH;
 
-int nstep = 6401;
-int pstep = 400;
+int nstep = 12801;
+int pstep = 200;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -41,7 +41,7 @@ double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][ND], phi2[N][ND];
-double con[ND], con2[ND], cons[ND], conl[ND];
+double cont[ND], cont2[ND], conp[N][ND];
 double temp[ND];
 int phiNum[ND];
 int phiIdx[N + 1][ND];
@@ -54,6 +54,7 @@ int main(void)
 {
 
     int i, j, k, im, ip, jm, jp, km, kp;
+    int ni, phinum0;
     double c0, cm0, sum0, lcount, dcm0;
 
     cout << "----------------------------------------------" << endl;
@@ -90,22 +91,48 @@ int main(void)
         if (i <= ND / 4)
         {
             phi[1][i] = 1.0;
-            cons[i] = calC1e(temp[i]);
+            conp[1][i] = calC1e(temp[i]);
             phi[0][i] = 0.0;
-            conl[i] = calC01e(temp[i]);
+            conp[0][i] = calC01e(temp[i]);
         }
         else
         {
             phi[1][i] = 0.0;
-            cons[i] = calC1e(temp[i]);
+            conp[1][i] = calC1e(temp[i]);
             phi[0][i] = 1.0;
-            conl[i] = cl;
+            conp[0][i] = cl;
         }
-        con[i] = cons[i] * phi[1][i] + conl[i] * phi[0][i];
-        sum0 += con[i];
+        cont[i] = conp[1][i] * phi[1][i] + conp[0][i] * phi[0][i];
+        sum0 += cont[i];
     }
     c0 = sum0 / ND;
     cm0 = sum0;
+
+    for (i = 0; i <= ndm; i++)
+    {
+        ip = i + 1;
+        im = i - 1;
+        if (i == ndm)
+        {
+            ip = ndm;
+        }
+        if (i == 0)
+        {
+            im = 0;
+        }
+
+        phinum0 = 0;
+        for (ni = 0; ni <= nm; ni++)
+        {
+            if ((phi[ni][i] > 0.0) ||
+                ((phi[ni][i] == 0.0) && (phi[ni][ip] > 0.0) || (phi[ni][im] > 0.0)))
+            {
+                phinum0++;
+                phiIdx[phinum0][i] = ni;
+            }
+        }
+        phiNum[i] = phinum0;
+    }
 
 #pragma omp parallel num_threads(NTH)
     {
@@ -137,32 +164,6 @@ int main(void)
             cout << "The nominal concnetration is " << c0 << endl;
         }
 
-        // ---------------------------------  Collect information of phase fields ------------------------------------
-        for (ix = start; ix <= end; ix++)
-        {
-            ixp = ix + 1;
-            ixm = ix - 1;
-            if (ix == ndm)
-            {
-                ixp = ndm;
-            }
-            if (ix == 0)
-            {
-                ixm = 0;
-            }
-
-            phinum = 0;
-            for (ii = 0; ii <= nm; ii++)
-            {
-                if ((phi[ii][ix] > 0.0) ||
-                    ((phi[ii][ix] == 0.0) && (phi[ii][ixp] > 0.0) || (phi[ii][ixm] > 0.0)))
-                {
-                    phinum++;
-                    phiIdx[phinum][ix] = ii;
-                }
-            }
-            phiNum[ix] = phinum;
-        }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
         for (ix = start; ix <= end; ix++)
@@ -198,11 +199,11 @@ int main(void)
                     }
                     if (ii == 1 && jj == 0)
                     {
-                        dF = calDF10(conl[ix], temp[ix], S0);
+                        dF = calDF10(conp[0][ix], temp[ix], S0);
                     }
                     else if (ii == 0 && jj == 1)
                     {
-                        dF = -calDF10(conl[ix], temp[ix], S0);
+                        dF = -calDF10(conp[0][ix], temp[ix], S0);
                     }
                     else
                     {
@@ -243,35 +244,61 @@ int main(void)
                 phi[kk][ix] = phi[kk][ix] / psum;
             }
         }
+        // ---------------------------  Collect information of phase fields ----------------------------------
+        for (ix = start; ix <= end; ix++)
+        {
+            ixp = ix + 1;
+            ixm = ix - 1;
+            if (ix == ndm)
+            {
+                ixp = ndm;
+            }
+            if (ix == 0)
+            {
+                ixm = 0;
+            }
+
+            phinum = 0;
+            for (ii = 0; ii <= nm; ii++)
+            {
+                if ((phi[ii][ix] > 0.0) ||
+                    ((phi[ii][ix] == 0.0) && (phi[ii][ixp] > 0.0) || (phi[ii][ixm] > 0.0)))
+                {
+                    phinum++;
+                    phiIdx[phinum][ix] = ii;
+                }
+            }
+            phiNum[ix] = phinum;
+        }
 #pragma omp barrier
         // --------------------- Calculate concentration in the interface and liquid phase --------------------------
         for (ix = start; ix <= end; ix++)
         {
             if (phi[0][ix] == 0.0)
             {
-                conl[ix] = calC01e(temp[ix]);
+                conp[0][ix] = calC01e(temp[ix]);
             }
             else if (phi[0][ix] > 0.0)
             {
-                cons[ix] = calC1e(temp[ix]);
-                conl[ix] = (con[ix] - cons[ix] * phi[1][ix]) / phi[0][ix];
-                if (conl[ix] > 1.0)
+                conp[1][ix] = calC1e(temp[ix]);
+                conp[0][ix] = (cont[ix] - conp[1][ix] * phi[1][ix]) / phi[0][ix];
+                if (conp[0][ix] > 1.0)
                 {
-                    conl[ix] = 1.0;
+                    conp[0][ix] = 1.0;
                 }
-                if (conl[ix] < 0.0)
+                if (conp[0][ix] < 0.0)
                 {
-                    conl[ix] = 0.0;
+                    conp[0][ix] = 0.0;
                 }
             }
-            con[ix] = cons[ix] * phi[1][ix] + conl[ix] * phi[0][ix];
-            if (con[ix] > 1.0)
+            cont[ix] = conp[1][ix] * phi[1][ix] + conp[0][ix] * phi[0][ix];
+            if (cont[ix] > 1.0)
             {
-                con[ix] = 1.0;
+                cont[ix] = 1.0;
             }
-            if (con[ix] < 0.0)
+            if (cont[ix] < 0.0)
             {
-                con[ix] = 0.0;
+                cont[ix] = 0.0;
             }
         }
 
@@ -281,45 +308,44 @@ int main(void)
         {
             sum0 = 0.0;
             lcount = 0.0;
-            // collect mass in liquid
-            for (ix = 0; ix <= ndm; ix++)
+        }
+#pragma omp barrier
+        // collect mass in liquid
+        for (ix = start; ix <= end; ix++)
+        {
+            if (phi[0][ix] == 1.0)
             {
-                if (phi[0][ix] == 1.0)
+                sum0 += cont[ix];
+                lcount += phi[0][ix];
+            }
+        }
+        c0 = sum0 / ND;
+        dcm0 = sum0 - cm0;
+#pragma omp barrier
+        // correction for mass conservation
+        for (ix = start; ix <= end; ix++)
+        {
+            if (phi[0][ix] == 1.0)
+            {
+                conp[0][ix] = conp[0][ix] - dcm0 / lcount;
+                cont[ix] = cont[ix] - dcm0 / lcount;
+                if (cont[ix] > 1.0)
                 {
-                    sum0 += con[ix];
-                    lcount += phi[0][ix];
+                    cont[ix] = 1.0;
+                }
+                if (cont[ix] < 0.0)
+                {
+                    cont[ix] = 0.0;
+                }
+                if (conp[0][ix] > 1.0)
+                {
+                    conp[0][ix] = 1.0;
+                }
+                if (conp[0][ix] < 0.0)
+                {
+                    conp[0][ix] = 0.0;
                 }
             }
-            c0 = sum0 / ND;
-            dcm0 = sum0 - cm0;
-            // correction for mass conservation
-            for (ix = 0; ix <= ndm; ix++)
-            {
-                if (phi[0][ix] == 1.0)
-                {
-                    conl[ix] = conl[ix] - dcm0 / lcount;
-                    con[ix] = con[ix] - dcm0 / lcount;
-                    if (con[ix] > 1.0)
-                    {
-                        con[ix] = 1.0;
-                    }
-                    if (con[ix] < 0.0)
-                    {
-                        con[ix] = 0.0;
-                    }
-                    if (conl[ix] > 1.0)
-                    {
-                        conl[ix] = 1.0;
-                    }
-                    if (conl[ix] < 0.0)
-                    {
-                        conl[ix] = 0.0;
-                    }
-                }
-            }
-
-            sum0 = 0.0;
-            lcount = 0.0;
         }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------
@@ -336,19 +362,19 @@ int main(void)
                 ixm = 0;
             }
             //拡散方程式内における微分計算
-            dev1_s = 0.25 * ((phi[1][ixp] - phi[1][ixm]) * (cons[ixp] - cons[ixm])) / dx / dx;
-            dev1_l = 0.25 * ((phi[0][ixp] - phi[0][ixm]) * (conl[ixp] - conl[ixm])) / dx / dx;
-            dev2_s = phi[1][ix] * (cons[ixp] + cons[ixm] - 2.0 * cons[ix]) / dx / dx;
-            dev2_l = phi[0][ix] * (conl[ixp] + conl[ixm] - 2.0 * conl[ix]) / dx / dx;
+            dev1_s = 0.25 * ((phi[1][ixp] - phi[1][ixm]) * (conp[1][ixp] - conp[1][ixm])) / dx / dx;
+            dev1_l = 0.25 * ((phi[0][ixp] - phi[0][ixm]) * (conp[0][ixp] - conp[0][ixm])) / dx / dx;
+            dev2_s = phi[1][ix] * (conp[1][ixp] + conp[1][ixm] - 2.0 * conp[1][ix]) / dx / dx;
+            dev2_l = phi[0][ix] * (conp[0][ixp] + conp[0][ixm] - 2.0 * conp[0][ix]) / dx / dx;
 
             cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-            con2[ix] = con[ix] + cddtt * dtime;                      //濃度場の時間発展(陽解法)
+            cont2[ix] = cont[ix] + cddtt * dtime;                    //濃度場の時間発展(陽解法)
                                                                      // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
         }
 
         for (ix = start; ix <= end; ix++)
         {
-            con[ix] = con2[ix];
+            cont[ix] = cont2[ix];
         }
 #pragma omp barrier
 
@@ -387,7 +413,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamc, "%e   ", con[i]);
+        fprintf(streamc, "%e   ", cont[i]);
         fprintf(streamc, "\n");
     }
     fclose(streamc); //ファイルをクローズ
@@ -399,7 +425,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamcl, "%e   ", conl[i]);
+        fprintf(streamcl, "%e   ", conp[0][i]);
         fprintf(streamcl, "\n");
     }
     fclose(streamcl); //ファイルをクローズ
@@ -411,7 +437,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "%e   ", conp[1][i]);
         fprintf(streamcs, "\n");
     }
     fclose(streamcs); //ファイルをクローズ
