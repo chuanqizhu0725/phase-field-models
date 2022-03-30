@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-ns = 1600
+ns = 2000
 step_arr = np.arange(0, ns*257, ns)
 for step in step_arr:
     df = pd.read_csv(f"data/phi/1d{step}.csv", header=None)
@@ -19,6 +19,6 @@ for step in step_arr:
     arrcs = dfcs[0].values
     plt.plot(arrc)
     plt.plot(arrcl)
-    # plt.plot(arr)
+    # plt.plot(arrcs)
     plt.savefig(f"figures/con/1d{step}")
     plt.close()
