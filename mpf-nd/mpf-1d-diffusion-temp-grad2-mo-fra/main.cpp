@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define N 3
+#define N 2
 #define ND 128
 #define NTH 1
 #define PI 3.14159
@@ -18,8 +18,8 @@ int nm = N - 1;
 int ndm = ND - 1;
 int rows = ND / NTH;
 
-int nstep = 100000;
-int pstep = 2000;
+int nstep = 500;
+int pstep = 100;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -36,7 +36,8 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double temp0 = 2.0;
-double gradT = 0.00;
+double gradT = 0.01;
+double dts = 0.01 / pstep;
 double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
@@ -56,7 +57,7 @@ int main(void)
     int i, j, k, im, ip, jm, jp, km, kp;
     int ni, phinum0, fcount;
     int intpos, dist, hasS, allS, allL;
-    double c0, dc0, sum0;
+    double c0, c00, dc0, sum0;
     fcount = 0;
 
     cout << "----------------------------------------------" << endl;
@@ -161,7 +162,7 @@ int main(void)
         {
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
-            cout << "The nominal concnetration is " << c0 << endl;
+            cout << "The nominal concnetration is " << c00 << endl;
         }
 
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
@@ -278,7 +279,7 @@ int main(void)
             if (phi[0][ix] == 0.0)
             {
                 conp[1][ix] = cont[ix];
-                // ****Correct abnormal calculation at solid edge***
+                // Correct abnormal calculation at solid edge
                 if (phi[1][ix] > 0.95)
                 {
                     conp[1][ix] = calC1e(temp[ix]);
@@ -328,6 +329,7 @@ int main(void)
             {
                 sum0 += cont[ix];
             }
+            c00 = sum0 / ND;
             dc0 = sum0 / ND - c0;
             // correction for mass conservation
             for (ix = 0; ix <= ndm; ix++)
@@ -375,67 +377,109 @@ int main(void)
             cont[ix] = cont2[ix];
         }
 
-//         // ----------------------------------------------  Moving frame  -----------------------------------------------
-//         fcount += 1;
-// #pragma omp barrier
-//         if (fcount = NTH && th_id == 0)
-//         {
-//             intpos = 0;
-//             // check if the bottom is solid
-//             if (phi[0][0] != 0.0)
-//             {
-//                 hasS = 0;
-//             }
-//             else if (phi[0][0] == 0.0)
-//             {
-//                 hasS = 1;
-//             }
-//             // search interface front
-//             if (hasS == 1)
-//             {
-//                 allS = 1;
-//                 for (ix = 0; ix <= ndm; ix++)
-//                 {
-//                     if (phi[0][i] > 0.0)
-//                     {
-//                         allS = 0;
-//                     }
-//                     if (allS == 0)
-//                     {
-//                         intpos = ix;
-//                         break;
-//                     }
-//                 }
+        // ----------------------------------------------  Moving frame  -----------------------------------------------
+        fcount += 1;
+#pragma omp barrier
+        if (fcount == NTH && th_id == 0)
+        {
 
-//                 allL = 0;
-//                 for (ix = intpos; ix <= ndm; ix++)
-//                 {
-//                     if (phi[0][i] == 0.0)
-//                     {
-//                         allL = 1;
-//                     }
-//                     if (allL == 1)
-//                     {
-//                         intpos = ix;
-//                         break;
-//                     }
-//                 }
-//             }
-//             if (intpos > ND / 2)
-//             {
-//                 dist = intpos - ND / 2;
-//             }
-//             else
-//             {
-//                 dist = 0;
-//             }
+            // cooling down
+            for (ix = 0; ix <= ndm; ix++)
+            {
+                temp[ix] -= dts;
+            }
 
-//             if (dist > 0)
-//             {
-//             }
+            intpos = 0;
+            // check if the bottom is solid
+            if (phi[0][0] != 0.0)
+            {
+                hasS = 0;
+            }
+            else if (phi[0][0] == 0.0)
+            {
+                hasS = 1;
+            }
+            // search interface front
+            if (hasS == 1)
+            {
+                allS = 1;
+                for (ix = 0; ix <= ndm; ix++)
+                {
+                    if (phi[0][ix] > 0.0)
+                    {
+                        allS = 0;
+                    }
+                    if (allS == 0)
+                    {
+                        intpos = ix;
+                        break;
+                    }
+                }
 
-//             fcount = 0;
-//         }
+                allL = 0;
+                for (ix = intpos; ix <= ndm; ix++)
+                {
+                    if (phi[0][ix] == 0.0)
+                    {
+                        allL = 1;
+                    }
+                    if (allL == 1)
+                    {
+                        intpos = ix;
+                        break;
+                    }
+                }
+            }
+            // check the distance from the middle of the domain
+            if (intpos > ND / 2)
+            {
+                dist = intpos - ND / 2;
+            }
+            else
+            {
+                dist = 0;
+            }
+
+            if (dist > 0 && (istep % pstep == 0))
+            {
+                cout << "the front distance is " << dist << endl;
+            }
+            if (dist > 0)
+            {
+                for (ix = 0; ix <= (ndm - dist); ix++)
+                {
+                    // temp
+                    temp[ix] = temp[ix + dist];
+                    // cont
+                    cont[ix] = cont[ix + dist];
+                    // phi
+                    phi[0][ix] = phi[0][ix + dist];
+                    phi[1][ix] = conp[1][ix + dist];
+                    // conp
+                    conp[0][ix] = conp[0][ix + dist];
+                    conp[1][ix] = conp[1][ix + dist];
+                }
+                for (ix = (ndm - dist + 1); ix <= ndm; ix++)
+                {
+                    // temp
+                    temp[ix] = temp[ndm - dist] + gradT * (ix - ndm + dist);
+                    // cont
+                    cont[ix] = cl;
+                    // phi
+                    phi[0][ix] = 1.0;
+                    phi[1][ix] = 0.0;
+                    // conp
+                    conp[0][ix] = cl;
+                    conp[1][ix] = calC1e(temp[ix]);
+                }
+                for (ix = 0; ix <= ndm; ix++)
+                {
+                    sum0 += cont[ix];
+                }
+                c0 = sum0 / ND;
+            }
+            fcount = 0;
+        }
 #pragma omp barrier
 
         istep = istep + 1;
@@ -494,10 +538,22 @@ void datasave(int step)
     sprintf(buffercs, "data/cons/1d%d.csv", step);
     streamcs = fopen(buffercs, "a"); //書き込む先のファイルを追記方式でオープン
 
-    for (int i = 0; i <= ndm; i++)
+    for (i = 0; i <= ndm; i++)
     {
         fprintf(streamcs, "%e   ", conp[1][i]);
         fprintf(streamcs, "\n");
+    }
+    fclose(streamcs); //ファイルをクローズ
+
+    FILE *streamt; //ストリームのポインタ設定
+    char buffert[30];
+    sprintf(buffert, "data/temp/1d%d.csv", step);
+    streamt = fopen(buffert, "a"); //書き込む先のファイルを追記方式でオープン
+
+    for (i = 0; i <= ndm; i++)
+    {
+        fprintf(streamt, "%e   ", temp[i] / 10.0);
+        fprintf(streamt, "\n");
     }
     fclose(streamcs); //ファイルをクローズ
 }
