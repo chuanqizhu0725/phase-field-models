@@ -11,7 +11,7 @@ using namespace std;
 
 #define N 3
 #define ND 128
-#define NTH 8
+#define NTH 4
 #define PI 3.14159
 
 int nm = N - 1;
@@ -36,7 +36,7 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double temp0 = 2.0;
-double gradT = 0.01;
+double gradT = -0.02;
 double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
@@ -281,10 +281,11 @@ int main(void)
             {
                 conp[1][ix] = calC1e(temp[ix]);
                 conp[0][ix] = (cont[ix] - conp[1][ix] * phi[1][ix]) / phi[0][ix];
-                // if (conp[0][ix] > calC01e(temp[ix]))
-                // {
-                //     conp[0][ix] = calC01e(temp[ix]);
-                // }
+                // Correct abnormal calculation at interface edge
+                if (phi[0][ix] < 0.05)
+                {
+                    conp[0][ix] = calC01e(temp[ix]);
+                }
                 if (conp[0][ix] > 1.0)
                 {
                     conp[0][ix] = 1.0;
