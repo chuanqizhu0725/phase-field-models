@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 64001;
-int pstep = 800;
+int nstep = 6401;
+int pstep = 400;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -35,7 +35,7 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double temp = 2.0;
-double cl = 0.4;
+double cl = 0.2;
 
 // Linear phae diagram
 double Te = 0.0;
@@ -235,37 +235,21 @@ start:;
 
     for (i = 0; i <= ndm; i++)
     {
-        cons[i] = c1e;
         if (phi[0][i] == 0.0)
         {
-
             conl[i] = c01e;
         }
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
+            cons[i] = c1e;
             conl[i] = (con[i] - cons[i] * phi[1][i]) / phi[0][i];
-            // correction for abnomal calculation
-            if (c01e >= cl)
+            if (conl[i] > 1.0)
             {
-                if (conl[i] > c01e)
-                {
-                    conl[i] = c01e;
-                }
-                else if (conl[i] < cl)
-                {
-                    conl[i] = cl;
-                }
+                conl[i] = 1.0;
             }
-            if (c01e < cl)
+            if (conl[i] < 0.0)
             {
-                if (conl[i] < c01e)
-                {
-                    conl[i] = c01e;
-                }
-                else if (conl[i] > cl)
-                {
-                    conl[i] = cl;
-                }
+                conl[i] = 0.0;
             }
         }
         else if (phi[0][i] == 1.0)
@@ -273,6 +257,14 @@ start:;
             conl[i] = con[i];
         }
         con[i] = cons[i] * phi[1][i] + conl[i] * phi[0][i];
+        if (con[i] > 1.0)
+        {
+            con[i] = 1.0;
+        }
+        if (con[i] < 0.0)
+        {
+            con[i] = 0.0;
+        }
     }
 
     // Evolution Equation of Concentration field
@@ -304,7 +296,7 @@ start:;
         con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
     }
 
-        sum1 = 0.0;
+    sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
         sum1 += con[i];
