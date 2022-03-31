@@ -10,16 +10,16 @@
 using namespace std;
 
 #define N 2
-#define ND 256
-#define NTH 1
+#define NTH 4
+#define ND 128
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 int rows = ND / NTH;
 
-int nstep = 40000;
-int pstep = 400;
+int nstep = 200001;
+int pstep = 2000;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -35,10 +35,10 @@ double S0 = 0.5;
 double Dl = 5.0;
 double Ds = 0.01;
 
-double temp0 = 2.0;
+double temp0 = 2.00;
 double gradT = 0.00;
-double dts = 0.00 / pstep;
-double cl = 0.1;
+double dts = 0.00 / nstep;
+double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][ND], phi2[N][ND];
@@ -55,10 +55,9 @@ int main(void)
 {
 
     int i, j, k, im, ip, jm, jp, km, kp;
-    int ni, phinum0, fcount;
+    int ni, phinum0;
     int intpos, dist, hasS, allS, allL;
     double c0, c00, dc0, sum0;
-    fcount = 0;
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
@@ -163,6 +162,7 @@ int main(void)
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
             cout << "The nominal concnetration is " << c00 << endl;
+            cout << "The th_id is " << th_id << endl;
         }
 
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
@@ -276,11 +276,21 @@ int main(void)
         // --------------------- Calculate concentration in the interface and liquid phase --------------------------
         for (ix = start; ix <= end; ix++)
         {
+            ixp = ix + 1;
+            ixm = ix - 1;
+            if (ix == ndm)
+            {
+                ixp = ndm;
+            }
+            if (ix == 0)
+            {
+                ixm = 0;
+            }
             if (phi[0][ix] == 0.0)
             {
                 conp[1][ix] = cont[ix];
                 // Correct abnormal calculation at solid edge
-                if (phi[1][ix] > 0.9)
+                if ((phi[0][ixp] > 0.0) || (phi[0][ixm] > 0.0))
                 {
                     conp[1][ix] = calC1e(temp[ix]);
                 }
@@ -291,7 +301,7 @@ int main(void)
                 conp[1][ix] = calC1e(temp[ix]);
                 conp[0][ix] = (cont[ix] - conp[1][ix] * phi[1][ix]) / phi[0][ix];
                 // Correct abnormal calculation at liquid edge
-                if (phi[0][ix] < 0.1)
+                if (phi[0][ix] < 0.05)
                 {
                     conp[0][ix] = calC01e(temp[ix]);
                 }
@@ -320,32 +330,30 @@ int main(void)
             }
         }
         // --------------------- Correct concentration in liquid phase for mass conservation --------------------------
-        fcount += 1;
 #pragma omp barrier
         // collect mass
-        if (fcount == NTH && th_id == 0)
+        if (th_id == 0)
         {
+            sum0 = 0.0;
             for (ix = 0; ix <= ndm; ix++)
             {
                 sum0 += cont[ix];
             }
             c00 = sum0 / ND;
             dc0 = sum0 / ND - c0;
-            // // correction for mass conservation
-            // for (ix = 0; ix <= ndm; ix++)
-            // {
-            //     cont[ix] = cont[ix] - dc0;
-            //     if (cont[ix] > 1.0)
-            //     {
-            //         cont[ix] = 1.0;
-            //     }
-            //     if (cont[ix] < 0.0)
-            //     {
-            //         cont[ix] = 0.0;
-            //     }
-            // }
-            fcount = 0;
-            sum0 = 0.0;
+            // correction for mass conservation in the interface region
+            for (ix = 0; ix <= ndm; ix++)
+            {
+                cont[ix] = cont[ix] - dc0;
+                if (cont[ix] > 1.0)
+                {
+                    cont[ix] = 1.0;
+                }
+                if (cont[ix] < 0.0)
+                {
+                    cont[ix] = 0.0;
+                }
+            }
         }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------
@@ -377,18 +385,21 @@ int main(void)
             cont[ix] = cont2[ix];
         }
 
-        // ----------------------------------------------  Moving frame  -----------------------------------------------
-        fcount += 1;
-#pragma omp barrier
-        if (fcount == NTH && th_id == 0)
+        // cooling down
+        for (ix = start; ix <= end; ix++)
         {
+            temp[ix] -= dts;
+        }
+        // --------------------------------  Long-range solute diffusion calculation -----------------------------------
 
-            // cooling down
-            for (ix = 0; ix <= ndm; ix++)
+        // ----------------------------------------------  Moving frame  -----------------------------------------------
+#pragma omp barrier
+        if (th_id == 0)
+        {
+            if (istep % pstep == 0)
             {
-                temp[ix] -= dts;
+                cout << "the thread which is moving frame is " << th_id << endl;
             }
-
             intpos = 0;
             // check if the bottom is solid
             if (phi[0][0] != 0.0)
@@ -434,6 +445,7 @@ int main(void)
             if (intpos > ND / 4)
             {
                 dist = intpos - ND / 4;
+                cout << "The dist is " << dist << endl;
                 for (ix = 0; ix <= (ndm - dist); ix++)
                 {
                     // temp
@@ -452,25 +464,18 @@ int main(void)
                     // temp
                     temp[ix] = temp[ndm - dist] + gradT * (ix - ndm + dist);
                     // cont
-                    cont[ix] = cl;
+                    cont[ix] = cont[ndm - dist];
                     // phi
                     phi[0][ix] = 1.0;
                     phi[1][ix] = 0.0;
                     // conp
-                    conp[0][ix] = cl;
+                    conp[0][ix] = cont[ix];
                     conp[1][ix] = calC1e(temp[ix]);
                 }
-                for (ix = 0; ix <= ndm; ix++)
-                {
-                    sum0 += cont[ix];
-                }
-                c0 = sum0 / ND;
             }
-            fcount = 0;
         }
-#pragma omp barrier
-
         istep = istep + 1;
+#pragma omp barrier
         if (istep < nstep)
         {
             goto start;
