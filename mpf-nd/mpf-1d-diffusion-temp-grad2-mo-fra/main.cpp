@@ -10,7 +10,7 @@
 using namespace std;
 
 #define N 2
-#define ND 128
+#define ND 256
 #define NTH 1
 #define PI 3.14159
 
@@ -18,8 +18,8 @@ int nm = N - 1;
 int ndm = ND - 1;
 int rows = ND / NTH;
 
-int nstep = 500;
-int pstep = 100;
+int nstep = 40000;
+int pstep = 400;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -36,9 +36,9 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double temp0 = 2.0;
-double gradT = 0.01;
-double dts = 0.01 / pstep;
-double cl = 0.2;
+double gradT = 0.00;
+double dts = 0.00 / pstep;
+double cl = 0.1;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][ND], phi2[N][ND];
@@ -91,7 +91,7 @@ int main(void)
     sum0 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
-        if (i <= ND / 4)
+        if (i <= ND / 8)
         {
             phi[1][i] = 1.0;
             conp[1][i] = calC1e(temp[i]);
@@ -280,7 +280,7 @@ int main(void)
             {
                 conp[1][ix] = cont[ix];
                 // Correct abnormal calculation at solid edge
-                if (phi[1][ix] > 0.95)
+                if (phi[1][ix] > 0.9)
                 {
                     conp[1][ix] = calC1e(temp[ix]);
                 }
@@ -291,7 +291,7 @@ int main(void)
                 conp[1][ix] = calC1e(temp[ix]);
                 conp[0][ix] = (cont[ix] - conp[1][ix] * phi[1][ix]) / phi[0][ix];
                 // Correct abnormal calculation at liquid edge
-                if (phi[0][ix] < 0.05)
+                if (phi[0][ix] < 0.1)
                 {
                     conp[0][ix] = calC01e(temp[ix]);
                 }
@@ -331,19 +331,19 @@ int main(void)
             }
             c00 = sum0 / ND;
             dc0 = sum0 / ND - c0;
-            // correction for mass conservation
-            for (ix = 0; ix <= ndm; ix++)
-            {
-                cont[ix] = cont[ix] - dc0;
-                if (cont[ix] > 1.0)
-                {
-                    cont[ix] = 1.0;
-                }
-                if (cont[ix] < 0.0)
-                {
-                    cont[ix] = 0.0;
-                }
-            }
+            // // correction for mass conservation
+            // for (ix = 0; ix <= ndm; ix++)
+            // {
+            //     cont[ix] = cont[ix] - dc0;
+            //     if (cont[ix] > 1.0)
+            //     {
+            //         cont[ix] = 1.0;
+            //     }
+            //     if (cont[ix] < 0.0)
+            //     {
+            //         cont[ix] = 0.0;
+            //     }
+            // }
             fcount = 0;
             sum0 = 0.0;
         }
@@ -431,21 +431,9 @@ int main(void)
                 }
             }
             // check the distance from the middle of the domain
-            if (intpos > ND / 2)
+            if (intpos > ND / 4)
             {
-                dist = intpos - ND / 2;
-            }
-            else
-            {
-                dist = 0;
-            }
-
-            if (dist > 0 && (istep % pstep == 0))
-            {
-                cout << "the front distance is " << dist << endl;
-            }
-            if (dist > 0)
-            {
+                dist = intpos - ND / 4;
                 for (ix = 0; ix <= (ndm - dist); ix++)
                 {
                     // temp
@@ -454,7 +442,7 @@ int main(void)
                     cont[ix] = cont[ix + dist];
                     // phi
                     phi[0][ix] = phi[0][ix + dist];
-                    phi[1][ix] = conp[1][ix + dist];
+                    phi[1][ix] = phi[1][ix + dist];
                     // conp
                     conp[0][ix] = conp[0][ix + dist];
                     conp[1][ix] = conp[1][ix + dist];
