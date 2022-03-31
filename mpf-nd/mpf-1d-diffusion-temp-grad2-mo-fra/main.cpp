@@ -25,6 +25,7 @@ int nstep = 200001;
 int pstep = 2000;
 
 double dx = 1.0;
+double dxL = 5.0;
 double dtime = 0.02;
 double gamma0 = 0.5;
 double mobi = 1.0;
@@ -505,13 +506,21 @@ int main(void)
                     // temp
                     temp[ix] = temp[ndm - dist] + gradT * (ix - ndm + dist);
                     // cont
-                    cont[ix] = cont[ndm - dist];
+                    cont[ix] = conlr[ix - ndm + dist];
                     // phi
                     phi[0][ix] = 1.0;
                     phi[1][ix] = 0.0;
                     // conp
                     conp[0][ix] = cont[ix];
                     conp[1][ix] = calC1e(temp[ix]);
+                }
+                for (ix = 0; ix <= (ndml - dist); ix++)
+                {
+                    conlr[ix] = conlr2[ix + dist];
+                }
+                for (ix = (ndml - dist + 1); ix <= ndml; ix++)
+                {
+                    conlr[ix] = cl;
                 }
             }
         }
