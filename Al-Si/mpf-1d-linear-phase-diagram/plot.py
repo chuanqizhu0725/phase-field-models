@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-ts = 40
+ts = 400
 step_arr = np.arange(0, ts*11, ts)
 for step in step_arr:
     df = pd.read_csv(f"data/phi/1d{step}.csv", header=None)

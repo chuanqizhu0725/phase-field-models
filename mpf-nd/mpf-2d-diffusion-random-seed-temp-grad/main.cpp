@@ -19,7 +19,7 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
-int nstep = 5001;
+int nstep = 10001;
 int pstep = 1000;
 
 double dx = 1.0;
@@ -474,6 +474,14 @@ start:;
             {
                 cont[i][j] = 0.0;
             }
+        }
+    }
+
+    for (i = 0; i <= ndmx; i++)
+    {
+        for (j = 0; j <= ndmy; j++)
+        {
+            temp[i][j] -= 1.5 / double(nstep);
         }
     }
 

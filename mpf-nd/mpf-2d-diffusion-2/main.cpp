@@ -19,8 +19,8 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
-int nstep = 6401;
-int pstep = 800;
+int nstep = 641;
+int pstep = 80;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -115,7 +115,7 @@ int main(void)
         }
     }
 
-    r0 = 5.0;
+    r0 = 10.0;
     for (ii = 1; ii <= nm; ii++)
     {
         x00 = rand() % NDX;
@@ -432,8 +432,7 @@ start:;
     }
     c0 = sum1 / NDX / NDY;
     dcm0 = sum1 - cm0;
-    icount = 0.0;
-
+    lcount = 0.0;
     // collect mass in  liquid
     for (i = 0; i <= ndmx; i++)
     {

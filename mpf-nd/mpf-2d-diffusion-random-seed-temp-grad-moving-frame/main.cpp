@@ -10,22 +10,23 @@
 
 using namespace std;
 
-#define N 3
-#define NDX 64
-#define NDY 64
+#define N 25
+#define NDX 128
+#define NDY 128
 #define PI 3.14159
 
 int nm = N - 1;
 int ndmx = NDX - 1;
-int ndmy = NDX - 1;
+int ndmy = NDY - 1;
 
-int nstep = 6001;
-int pstep = 400;
+int nstep = 60001;
+int pstep = 2000;
 
-double DT = 0.0;
+double DT = 3.0;
+double gradT = 0.02;
 
 double dx = 1.0;
-double dtime = 0.01;
+double dtime = 0.02;
 double gamma0 = 0.5;
 double mobi = 1.0;
 double delta = 5.0 * dx;
@@ -98,8 +99,8 @@ int main(void)
         for (j = 0; j <= ndmy; j++)
         {
             // temp[i][j] = -1.0 * (1.0 - (double(i) / double(ndmx / 2)));
-            // temp[i][j] = -1.0 + i * 0.02;
-            temp[i][j] = -1.0;
+            temp[i][j] = -1.0 + i * gradT;
+            // temp[i][j] = -1.0;
         }
     }
 
@@ -119,7 +120,7 @@ int main(void)
             }
         }
     }
-    r0 = 10.0;
+    r0 = 5.0;
     for (ii = 1; ii <= nm; ii++)
     {
         x00 = rand() % (NDX / 2);
@@ -519,88 +520,88 @@ start:;
     }
 
     // moving frame
-    // for (i = 0; i <= ndmx; i++)
-    // {
-    //     allSolid = 1;
-    //     for (j = 0; j <= ndmy; j++)
-    //     {
-    //         if (phi[0][i][j] == 1.0)
-    //         {
-    //             allSolid = 0;
-    //             break;
-    //         }
-    //     }
-    //     if (allSolid == 1)
-    //     {
-    //         intpos = i;
-    //     }
-    //     else
-    //     {
-    //         break;
-    //     }
-    // }
+    for (i = 0; i <= ndmx; i++)
+    {
+        allSolid = 1;
+        for (j = 0; j <= ndmy; j++)
+        {
+            if (phi[0][i][j] == 1.0)
+            {
+                allSolid = 0;
+                break;
+            }
+        }
+        if (allSolid == 1)
+        {
+            intpos = i;
+        }
+        else
+        {
+            break;
+        }
+    }
 
-    // for (i = intpos; i <= ndmx; i++)
-    // {
-    //     allLiquid = 1;
-    //     for (j = 0; j <= ndmy; j++)
-    //     {
-    //         if (phi[0][i][j] < 1.0)
-    //         {
-    //             allLiquid = 0;
-    //             break;
-    //         }
-    //     }
-    //     if (allLiquid == 1)
-    //     {
-    //         intpos = i;
-    //         break;
-    //     }
-    // }
+    for (i = intpos; i <= ndmx; i++)
+    {
+        allLiquid = 1;
+        for (j = 0; j <= ndmy; j++)
+        {
+            if (phi[0][i][j] < 1.0)
+            {
+                allLiquid = 0;
+                break;
+            }
+        }
+        if (allLiquid == 1)
+        {
+            intpos = i;
+            break;
+        }
+    }
 
-    // if (intpos > NDX / 2)
-    // {
-    //     dist = intpos - NDX / 2;
-    // }
-    // else
-    // {
-    //     dist = 0;
-    // }
-    // if (dist > 0)
-    // {
-    //     cout << dist << endl;
-    //     for (i = 0; i <= (ndmx - dist); i++)
-    //     {
-    //         for (j = 0; j <= ndmy; j++)
-    //         {
-    //             for (kk = 0; kk <= nm; kk++)
-    //             {
-    //                 phi[kk][i][j] = phi2[kk][i + dist][j];
-    //                 conp[kk][i][j] = conp[kk][i + dist][j];
-    //                 cont[i][j] = cont[i + dist][j];
-    //             }
-    //             temp[i][j] = temp[i + dist][j];
-    //         }
-    //     }
+    if (intpos > NDX / 2)
+    {
+        dist = intpos - NDX / 2;
+    }
+    else
+    {
+        dist = 0;
+    }
+    if (dist > 0)
+    {
+        // cout << dist << endl;
+        for (i = 0; i <= (ndmx - dist); i++)
+        {
+            for (j = 0; j <= ndmy; j++)
+            {
+                for (kk = 0; kk <= nm; kk++)
+                {
+                    phi[kk][i][j] = phi2[kk][i + dist][j];
+                    conp[kk][i][j] = conp[kk][i + dist][j];
+                    cont[i][j] = cont[i + dist][j];
+                }
+                temp[i][j] = temp[i + dist][j];
+            }
+        }
 
-    //     for (i = (ndmx - dist + 1); i <= ndmx; i++)
-    //     {
-    //         for (j = 0; j <= ndmy; j++)
-    //         {
-    //             c1e = calC1e(temp[i][j]);
-    //             c2e = calC2e(temp[i][j]);
-    //             for (kk = 1; kk <= nm; kk++)
-    //             {
-    //                 phi[kk][i][j] = 0.0;
-    //                 conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
-    //             }
-    //             phi[0][i][j] = 1.0;
-    //             conp[0][i][j] = cont[ndmx - dist][j];
-    //             cont[i][j] = conp[0][i][j];
-    //             temp[i][j] = temp[ndmx - dist][j] + 0.04 * (i - ndmx + dist);
-    //         }
-    //     }
-    // }
+        for (i = (ndmx - dist + 1); i <= ndmx; i++)
+        {
+            for (j = 0; j <= ndmy; j++)
+            {
+                c1e = calC1e(temp[i][j]);
+                c2e = calC2e(temp[i][j]);
+                for (kk = 1; kk <= nm; kk++)
+                {
+                    phi[kk][i][j] = 0.0;
+                    conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
+                }
+                phi[0][i][j] = 1.0;
+                conp[0][i][j] = cont[ndmx - dist][j];
+                cont[i][j] = conp[0][i][j];
+                temp[i][j] = temp[ndmx - dist][j] + gradT * (i - ndmx + dist);
+            }
+        }
+    }
 
     istep = istep + 1;
     if (istep < nstep)

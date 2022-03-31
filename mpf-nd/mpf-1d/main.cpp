@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 4001;
-int pstep = 400;
+int nstep = 401;
+int pstep = 40;
 
 double dx = 1.0;
 double dtime = 0.05;
@@ -29,7 +29,7 @@ double delta = 7.0 * dx;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 0.5;
+double F0 = 10.0;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 

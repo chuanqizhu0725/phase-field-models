@@ -11,8 +11,8 @@
 using namespace std;
 
 #define N 2
-#define NDX 100
-#define NDY 100
+#define NDX 64
+#define NDY 64
 #define PI 3.14159
 
 int nm = N - 1;
@@ -20,24 +20,26 @@ int ndmx = NDX - 1;
 int ndmy = NDX - 1;
 
 int nstep = 1001;
-int pstep = 100;
+int pstep = 200;
 
 double dx = 1.0;
-double dtime = 0.05;
+double dtime = 0.02;
 double gamma0 = 0.5;
 double mobi = 1.0;
-double delta = 7.0 * dx;
+double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double F0 = 0.5;
 
-double Dl = 2.0;
+double Dl = 5.0;
 double Ds = 0.01;
 
 double temp = 2.0;
-double cl = 0.15;
+double cl = 0.2;
+// double temp = -1.0;
+// double cl = 0.5;
 
 // Linear phae diagram
 double Te = 0.0;
@@ -67,6 +69,8 @@ int i, j, im, ip, jm, jp, k;
 int ii, jj, kk;
 int n1, n2, n3;
 int istep;
+int x00, y00, ptype;
+double r0, r;
 
 double dF, pddtt, sum1;
 double termiikk, termjjkk;
@@ -97,27 +101,100 @@ int main(void)
         }
     }
 
-    sum1 = 0.0;
+    // for (i = 0; i <= ndmx; i++)
+    // {
+    //     for (j = 0; j <= ndmy; j++)
+    //     {
+    //         phi[0][i][j] = 1.0;
+    //         conp[0][i][j] = cl;
+    //         for (kk = 1; kk <= nm; kk++)
+    //         {
+
+    //             phi[kk][i][j] = 0.0;
+    //             conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
+    //         }
+    //     }
+    // }
+
+    // r0 = 10.0;
+    // for (ii = 1; ii <= nm; ii++)
+    // {
+    //     x00 = rand() % NDX;
+    //     y00 = rand() % NDY;
+    //     for (i = 0; i <= ndmx; i++)
+    //     {
+    //         for (j = 0; j <= ndmy; j++)
+    //         {
+    //             r = sqrt(double(((i - x00)) * (i - x00) + (j - y00) * (j - y00)));
+    //             if (r <= r0)
+    //             {
+    //                 if (ii % 2 == 1)
+    //                 {
+    //                     phi[ii][i][j] = 1.0;
+    //                     conp[ii][i][j] = c1e;
+    //                     phi[0][i][j] = 0.0;
+    //                     conp[0][i][j] = c01e;
+    //                     for (kk = 0; kk <= nm; kk++)
+    //                     {
+    //                         if (kk != ii)
+    //                         {
+    //                             phi[kk][i][j] = 0.0;
+    //                             conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
+    //                         }
+    //                     }
+    //                 }
+    //                 else if (ii % 2 == 0)
+    //                 {
+    //                     phi[ii][i][j] = 1.0;
+    //                     conp[ii][i][j] = c2e;
+    //                     phi[0][i][j] = 0.0;
+    //                     conp[0][i][j] = c02e;
+    //                     for (kk = 0; kk <= nm; kk++)
+    //                     {
+    //                         if (kk != ii)
+    //                         {
+    //                             phi[kk][i][j] = 0.0;
+    //                             conp[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // sum1 = 0.0;
+    // for (i = 0; i <= ndmx; i++)
+    // {
+    //     for (j = 0; j <= ndmy; j++)
+    //     {
+    //         for (kk = 0; kk <= nm; kk++)
+    //         {
+    //             cont[i][j] += phi[kk][i][j] * conp[kk][i][j];
+    //         }
+    //         sum1 += cont[i][j];
+    //     }
+    // }
+
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (i <= NDX / 8)
+            if ((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < 100)
             {
-                phi[1][i][j] = 1.0;
-                conp[1][i][j] = c1e;
                 phi[0][i][j] = 0.0;
                 conp[0][i][j] = c01e;
+                phi[1][i][j] = 1.0;
+                conp[1][i][j] = c1e;
             }
             else
             {
-                phi[1][i][j] = 0.0;
-                conp[1][i][j] = c1e;
                 phi[0][i][j] = 1.0;
                 conp[0][i][j] = cl;
+                phi[1][i][j] = 0.0;
+                conp[1][i][j] = c1e;
             }
-            cont[i][j] = phi[1][i][j] * conp[1][i][j] + phi[0][i][j] * conp[0][i][j];
-
+            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[0][i][j] * phi[0][i][j];
             sum1 += cont[i][j];
         }
     }
@@ -129,6 +206,7 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
+        cout << "The nominal concnetration is " << c0 << endl;
     }
 
     for (i = 0; i <= ndmx; i++)
@@ -225,6 +303,14 @@ start:;
                     {
                         dF = -((conp[0][i][j] - ce) * ml1 + Te - temp) * 0.5;
                     }
+                    else if (ii == 2 && jj == 0)
+                    {
+                        dF = ((conp[0][i][j] - ce) * ml2 + Te - temp) * 0.5;
+                    }
+                    else if (ii == 0 && jj == 2)
+                    {
+                        dF = -((conp[0][i][j] - ce) * ml2 + Te - temp) * 0.5;
+                    }
                     else
                     {
                         dF = 0.0;
@@ -278,19 +364,26 @@ start:;
         for (j = 0; j <= ndmy; j++)
         {
             conp[1][i][j] = c1e;
-            if (phi[0][i][j] > 0.0)
+            conp[2][i][j] = c2e;
+            // liquid in pure phase 1 or phase 2 or their mixer
+            if (phi[0][i][j] == 0.0)
             {
-                conp[0][i][j] = (cont[i][j] - conp[1][i][j] * phi[1][i][j]) / phi[0][i][j];
-                if (conp[0][i][j] > c01e)
+                conp[0][i][j] = c01e * phi[1][i][j] + c02e * phi[2][i][j];
+            }
+            // liquid in phase 2 or phase 1 or their mixer
+            else if (phi[0][i][j] > 0.0 || (phi[1][i][j] >= 0.0 || phi[2][i][j] >= 0.0))
+            {
+                conp[0][i][j] = (cont[i][j] - phi[2][i][j] * conp[2][i][j] - phi[1][i][j] * conp[1][i][j]) / phi[0][i][j];
+                if (conp[0][i][j] >= c01e)
                 {
                     conp[0][i][j] = c01e;
                 }
+                else if (conp[0][i][j] <= c02e)
+                {
+                    conp[0][i][j] = c02e;
+                }
             }
-            else if (phi[0][i][j] == 0.0)
-            {
-                conp[0][i][j] = cont[i][j];
-            }
-            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[0][i][j] * phi[0][i][j];
+            cont[i][j] = conp[2][i][j] * phi[2][i][j] + conp[1][i][j] * phi[1][i][j] + conp[0][i][j] * phi[0][i][j];
         }
     }
 
@@ -351,6 +444,7 @@ start:;
             sum1 += cont[i][j];
         }
     }
+    c0 = sum1 / NDX / NDY;
     dc0 = sum1 / NDX / NDY - c0;
     for (i = 0; i <= ndmx; i++)
     {

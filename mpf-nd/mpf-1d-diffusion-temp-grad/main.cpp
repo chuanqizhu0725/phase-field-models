@@ -34,26 +34,15 @@ double S0 = 0.5;
 double Dl = 5.0;
 double Ds = 0.01;
 
-double temp = 2.0;
+double temp0 = 2.0;
+double gradT = 0.00;
 double cl = 0.2;
-
-// Linear phae diagram
-double Te = 0.0;
-double ce = 0.5;
-double ml1 = -10.0;
-double kap1 = 0.2;
-double c01e = ce + (temp - Te) / ml1;
-double c1e = c01e * kap1;
-
-double ml2 = 10.0;
-double kap2 = 0.2;
-double c02e = ce + (temp - Te) / ml2;
-double c2e = 1.0 - (1.0 - c02e) * kap2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][ND], phi2[N][ND];
 double con[ND], con2[ND], cons[ND], conl[ND];
+double temp[ND];
 
 int phinum;
 int phiNum[ND];
@@ -71,6 +60,8 @@ double dF, pddtt, sum1;
 double termiikk, termjjkk;
 
 void datasave(int step);
+double calC01e(double temp0), calC1e(double temp0), calC02e(double temp0), calC2e(double temp0);
+double calDF10(double con0, double temp0, double dS), calDF20(double con0, double temp0, double dS);
 
 int main(void)
 {
@@ -98,17 +89,18 @@ int main(void)
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
+        temp[i] = temp0 + gradT * i;
         if (i <= ND / 4)
         {
             phi[1][i] = 1.0;
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             phi[0][i] = 0.0;
-            conl[i] = c01e;
+            conl[i] = calC01e(temp[i]);
         }
         else
         {
             phi[1][i] = 0.0;
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             phi[0][i] = 1.0;
             conl[i] = cl;
         }
@@ -187,11 +179,11 @@ start:;
                 }
                 if (ii == 1 && jj == 0)
                 {
-                    dF = ((conl[i] - ce) * ml1 + Te - temp) * S0;
+                    dF = calDF10(conl[i], temp[i], S0);
                 }
                 else if (ii == 0 && jj == 1)
                 {
-                    dF = -(((conl[i] - ce) * ml1 + Te - temp)) * S0;
+                    dF = -calDF10(conl[i], temp[i], S0);
                 }
                 else
                 {
@@ -237,11 +229,12 @@ start:;
     {
         if (phi[0][i] == 0.0)
         {
-            conl[i] = c01e;
+            cons[i] = calC1e(temp[i]);
+            conl[i] = calC01e(temp[i]);
         }
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
         {
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             conl[i] = (con[i] - cons[i] * phi[1][i]) / phi[0][i];
             if (conl[i] > 1.0)
             {
@@ -254,7 +247,7 @@ start:;
         }
         else if (phi[0][i] == 1.0)
         {
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             conl[i] = con[i];
         }
         con[i] = cons[i] * phi[1][i] + conl[i] * phi[0][i];
@@ -266,30 +259,6 @@ start:;
         {
             con[i] = 0.0;
         }
-    }
-
-    // Evolution Equation of Concentration field
-    for (i = 0; i <= ndm; i++)
-    {
-        ip = i + 1;
-        im = i - 1;
-        if (i == ndm)
-        {
-            ip = ndm;
-        }
-        if (i == 0)
-        {
-            im = 0;
-        }
-        //拡散方程式内における微分計算
-        dev1_s = 0.25 * ((phi[1][ip] - phi[1][im]) * (cons[ip] - cons[im])) / dx / dx;
-        dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (conl[ip] - conl[im])) / dx / dx;
-        dev2_s = phi[1][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
-        dev2_l = phi[0][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
-
-        cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-        con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
-                                                                 // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
     }
 
     for (i = 0; i <= ndm; i++)
@@ -312,7 +281,7 @@ start:;
         if (phi[0][i] > 0.0)
         {
             sum1 += con[i];
-            lcount += 1.0;
+            lcount += phi[0][i];
         }
     }
     // correction for mass conservation
@@ -339,6 +308,30 @@ start:;
                 conl[i] = 0.0;
             }
         }
+    }
+
+    // Evolution Equation of Concentration field
+    for (i = 0; i <= ndm; i++)
+    {
+        ip = i + 1;
+        im = i - 1;
+        if (i == ndm)
+        {
+            ip = ndm;
+        }
+        if (i == 0)
+        {
+            im = 0;
+        }
+        //拡散方程式内における微分計算
+        dev1_s = 0.25 * ((phi[1][ip] - phi[1][im]) * (cons[ip] - cons[im])) / dx / dx;
+        dev1_l = 0.25 * ((phi[0][ip] - phi[0][im]) * (conl[ip] - conl[im])) / dx / dx;
+        dev2_s = phi[1][i] * (cons[ip] + cons[im] - 2.0 * cons[i]) / dx / dx;
+        dev2_l = phi[0][i] * (conl[ip] + conl[im] - 2.0 * conl[i]) / dx / dx;
+
+        cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
+        con2[i] = con[i] + cddtt * dtime;                        //濃度場の時間発展(陽解法)
+                                                                 // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
     }
 
     istep = istep + 1;
@@ -401,4 +394,66 @@ void datasave(int step)
         fprintf(streamcs, "\n");
     }
     fclose(streamcs); //ファイルをクローズ
+}
+
+double calC01e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double kap1 = 0.2;
+    double c01e;
+    c01e = ce + (temp0 - Te) / ml1;
+    return c01e;
+}
+
+double calC1e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double kap1 = 0.2;
+    double c1e;
+    c1e = (ce + (temp0 - Te) / ml1) * kap1;
+    return c1e;
+}
+
+double calC02e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double kap2 = 0.2;
+    double c02e;
+    c02e = ce + (temp0 - Te) / ml2;
+    return c02e;
+}
+
+double calC2e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double kap2 = 0.2;
+    double c2e;
+    c2e = 1.0 - (1.0 - (ce + (temp0 - Te) / ml2)) * kap2;
+    return c2e;
+}
+
+double calDF10(double con0, double temp0, double dS)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double DF = ((con0 - ce) * ml1 + Te - temp0) * dS;
+    return DF;
+}
+
+double calDF20(double con0, double temp0, double dS)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double DF = ((con0 - ce) * ml2 + Te - temp0) * dS;
+    return DF;
 }

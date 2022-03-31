@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-ns = 800
+ns = 80
 nx = 64
 ny = 64
 step_arr = np.arange(0, ns*11, ns)

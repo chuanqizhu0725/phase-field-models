@@ -17,8 +17,8 @@ using namespace std;
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 401;
-int pstep = 40;
+int nstep = 4001;
+int pstep = 400;
 
 double dx = 1.0e-7;
 double dtime = 1.0e-6;
@@ -33,9 +33,12 @@ double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double F0 = 5.0e4;
 
-double temp = 880.0; // K
-double cl = 0.04;
+// double temp = 880.0; // K
+// double cl = 0.04;
 // double cl = 0.18;
+
+double temp = 820.0;
+double cl = 0.12;
 
 // Linear phae diagram
 double Te = 850.0;
@@ -120,6 +123,15 @@ int main(void)
             phi[0][i] = 0.0;
             conp[0][i] = c01e;
         }
+        // if (i >= ND * 7 / 8)
+        // {
+        //     phi[1][i] = 0.0;
+        //     conp[1][i] = c1e;
+        //     phi[2][i] = 1.0;
+        //     conp[2][i] = c2e;
+        //     phi[0][i] = 0.0;
+        //     conp[0][i] = c02e;
+        // }
         else
         {
             phi[1][i] = 0.0;
@@ -279,6 +291,7 @@ start:;
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0 && phi[1][i] > 0.0 && phi[1][i] < 1.0 && phi[2][i] == 0.0)
         {
             conp[1][i] = c1e;
+            conp[2][i] = c2e;
             conp[0][i] = (cont[i] - conp[1][i] * phi[1][i]) / phi[0][i];
             if (conp[0][i] > c01e)
             {
@@ -288,6 +301,7 @@ start:;
         // interface of phase 2
         else if (phi[0][i] > 0.0 && phi[0][i] < 1.0 && phi[2][i] > 0.0 && phi[2][i] < 1.0 && phi[1][i] == 0.0)
         {
+            conp[1][i] = c1e;
             conp[2][i] = c2e;
             conp[0][i] = (cont[i] - conp[2][i] * phi[2][i]) / phi[0][i];
             if (conp[0][i] < c02e)
@@ -299,11 +313,13 @@ start:;
         else if (phi[1][i] == 1.0)
         {
             conp[1][i] = c1e;
+            conp[2][i] = c2e;
             conp[0][i] = c01e;
         }
         // phase 2
         else if (phi[2][i] == 1.0)
         {
+            conp[1][i] = c1e;
             conp[2][i] = c2e;
             conp[0][i] = c02e;
         }
@@ -387,7 +403,7 @@ void datasave(int step)
 
     for (int i = 0; i <= ndm; i++)
     {
-        fprintf(stream, "%e   ", phi[1][i]);
+        fprintf(stream, "%e   ", phi[2][i]);
         fprintf(stream, "\n");
     }
     fclose(stream); //ファイルをクローズ

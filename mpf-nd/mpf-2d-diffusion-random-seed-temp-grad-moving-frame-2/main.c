@@ -4,7 +4,7 @@
 #include <time.h>
 #include <math.h>
 
-#define N 3
+#define N 5
 #define NDX 64
 #define NDY 64
 #define PI 3.14159
@@ -13,8 +13,8 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 
-int nstep = 2001;
-int pstep = 200;
+int nstep = 4801;
+int pstep = 800;
 
 double dx = 1.0;
 double dtime = 0.02;
@@ -22,7 +22,7 @@ double gamma0 = 0.5;
 double mobi = 1.0;
 double delta = 5.0;
 
-double A0, W0, M0, F0;
+double A0, W0, M0, S0;
 
 double Dl = 5.0;
 double Ds = 0.01;
@@ -41,25 +41,22 @@ int i, j, im, ip, jm, jp, k;
 int ii, jj, kk;
 int n1, n2, n3;
 int istep;
-int x00, y00, ptype;
+int x00, y00;
 double r0, r;
 
 double dF, pddtt, sum1, sums, suml;
 double termiikk, termjjkk;
 double phidxx, phidyy;
 
-double csta, psta;
-
 int intpos, allSolid, allLiquid, dist;
 
-// void datasave(int step);
-double calC01e(double temp0), calC1e(double temp0), calC02e(double temp0), calC2e(double temp0);
-double calDF10(double con0, double temp0), calDF20(double con0, double temp0);
+double calC01e(), calC1e(), calC02e(), calC2e();
+double calDF10(), calDF20();
 
 int main(void)
 {
-    csta = dtime * Dl / dx / dx;
-    psta = dtime / dx / dx * mobi * A0;
+    double csta = dtime * Dl / dx / dx;
+    double psta = dtime / dx / dx * mobi * A0;
     printf("----------------------------------------------\n");
     printf("Computation Started!");
     printf("concenration field stablity number is: %e\n", csta);
@@ -68,6 +65,7 @@ int main(void)
     double(*mij)[N][N] = malloc(sizeof(*mij));
     double(*wij)[N][N] = malloc(sizeof(*wij));
     double(*aij)[N][N] = malloc(sizeof(*aij));
+    double(*sij)[N][N] = malloc(sizeof(*sij));
     double(*phi)[N][NDX][NDY] = malloc(sizeof(*phi));
     double(*phi2)[N][NDX][NDY] = malloc(sizeof(*phi2));
     double(*cont)[NDX][NDY] = malloc(sizeof(*cont));
@@ -76,13 +74,14 @@ int main(void)
     double(*temp)[NDX][NDY] = malloc(sizeof(*temp));
     int(*phiNum)[NDX][NDY] = malloc(sizeof(*phiNum));
     int(*phiIdx)[N + 1][NDX][NDY] = malloc(sizeof(*phiIdx));
-    int Nn, Nl[N], phinum;
+    int Nn, Nl[N], phinum, count;
 
     A0 = 8.0 * delta * gamma0 / PI / PI;
     W0 = 4.0 * gamma0 / delta;
     M0 = mobi * PI * PI / (8.0 * delta);
-    F0 = 0.5;
+    S0 = 0.5;
 
+    // ------------------ Interface Initialization----------------------
     for (i = 0; i <= nm; i++)
     {
         for (j = 0; j <= nm; j++)
@@ -90,25 +89,27 @@ int main(void)
             (*wij)[i][j] = W0;
             (*aij)[i][j] = A0;
             (*mij)[i][j] = M0;
+            (*sij)[i][j] = S0;
             if (i == j)
             {
                 (*wij)[i][j] = 0.0;
                 (*aij)[i][j] = 0.0;
                 (*mij)[i][j] = 0.0;
+                (*sij)[i][j] = 0.0;
             }
         }
     }
 
+    // ------------------ Temperature Initialization----------------------
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            // (*temp)[i][j] = -1.0 * (1.0 - (double(i) / double(ndmx / 2)));
             (*temp)[i][j] = temp0 + i * gradT;
-            // (*temp)[i][j] = -1.0;
         }
     }
 
+    // ------------------ Seeds Initialization   ----------------------
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
@@ -191,6 +192,7 @@ int main(void)
     c0 = sum1 / NDX / NDY;
     cm0 = sum1;
 
+//********************************** Computation start ******************************************
 start:;
 
     for (i = 0; i <= nm; i++)
@@ -286,19 +288,95 @@ start:;
         fclose(streamt); //ファイルをクローズ
 
         printf("%d steps have passed!\n", istep);
-        // cout << "The interface postion is " << intpo << endl;
         printf("The nominal concnetration is %e\n", c0);
 
         // remove redundant memroy of phase and con fields
-        Nn = 0;
-        for (i = 0; i <= nm; i++)
-        {
-            printf("phase %d\n", Nl[i]);
-            if (Nl[i] != N)
-            {
-                Nn += 1;
-            }
-        }
+        // Nn = 0;
+        // for (i = 0; i <= nm; i++)
+        // {
+        //     printf("phase %d\n", Nl[i]);
+        //     if (Nl[i] != N)
+        //     {
+        //         Nn += 1;
+        //     }
+        // }
+        // double(*mijn)[Nn][Nn] = malloc(sizeof(*mijn));
+        // double(*aijn)[Nn][Nn] = malloc(sizeof(*aijn));
+        // double(*wijn)[Nn][Nn] = malloc(sizeof(*wijn));
+        // for (i = 0; i < Nn; i++)
+        // {
+        //     for (j = 0; j < Nn; j++)
+        //     {
+        //         (*wijn)[i][j] = W0;
+        //         (*aijn)[i][j] = A0;
+        //         (*mijn)[i][j] = M0;
+        //         if (i == j)
+        //         {
+        //             (*wijn)[i][j] = 0.0;
+        //             (*aijn)[i][j] = 0.0;
+        //             (*mijn)[i][j] = 0.0;
+        //         }
+        //     }
+        // }
+        // free(mij);
+        // free(aij);
+        // free(wij);
+        // mij = malloc(sizeof(*mijn));
+        // aij = malloc(sizeof(*aijn));
+        // wij = malloc(sizeof(*wijn));
+        // for (i = 0; i < Nn; i++)
+        // {
+        //     for (j = 0; j < Nn; j++)
+        //     {
+        //         (*wij)[i][j] = (*wijn)[i][j];
+        //         (*aij)[i][j] = (*aijn)[i][j];
+        //         (*mij)[i][j] = (*mijn)[i][j];
+        //     }
+        // }
+        // free(mijn);
+        // free(aijn);
+        // free(wijn);
+
+        // double(*phin)[Nn][NDX][NDY] = malloc(sizeof(*phin));
+        // double(*phi2n)[Nn][NDX][NDY] = malloc(sizeof(*phi2n));
+        // double(*conpn)[Nn][NDX][NDY] = malloc(sizeof(*conpn));
+        // phinum = 0;
+        // for (kk = 0; kk < N; kk++)
+        // {
+        //     n1 = Nl[kk];
+        //     if (n1 != N)
+        //     {
+        //         phinum++;
+        //         for (i = 0; i <= ndmx; i++)
+        //         {
+        //             for (j = 0; j <= ndmy; j++)
+        //             {
+        //                 (*phin)[phinum][i][j] = (*phi)[n1][i][j];
+        //                 (*conpn)[phinum][i][j] = (*conp)[n1][i][j];
+        //             }
+        //         }
+        //     }
+        // }
+        // free(phi);
+        // free(phi2);
+        // free(conp);
+        // phi = malloc(sizeof(*phin));
+        // phi2 = malloc(sizeof(*phi2n));
+        // conp = malloc(sizeof(*conpn));
+        // for (i = 0; i <= ndmx; i++)
+        // {
+        //     for (j = 0; j <= ndmy; j++)
+        //     {
+        //         for (kk = 0; kk < Nn; kk++)
+        //         {
+        //             (*phi)[kk][i][j] = (*phin)[kk][i][j];
+        //             (*conp)[kk][i][j] = (*conpn)[kk][i][j];
+        //         }
+        //     }
+        // }
+        // free(phin);
+        // free(phi2n);
+        // free(conpn);
     }
 
     // Calculate the concentration field in solid and liqud phase
@@ -413,8 +491,7 @@ start:;
                    (*phi)[0][i][j] * ((*conp)[0][ip][j] + (*conp)[0][im][j] + (*conp)[0][i][jp] + (*conp)[0][i][jm] - 4.0 * (*conp)[0][i][j]) / dx / dx;
 
             cddtt = Ds * sums + Dl * suml;
-            (*cont2)[i][j] = (*cont)[i][j] + cddtt * dtime; //濃度場の時間発展(陽解法)
-                                                            // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+            (*cont2)[i][j] = (*cont)[i][j] + cddtt * dtime;
         }
     }
 
@@ -515,19 +592,19 @@ start:;
                     }
                     else if (ii % 2 == 1 && jj == 0)
                     {
-                        dF = calDF10((*conp)[0][i][j], (*temp)[i][j]);
+                        dF = calDF10((*conp)[0][i][j], (*temp)[i][j], (*sij)[ii][jj]);
                     }
                     else if (ii == 0 && jj % 2 == 1)
                     {
-                        dF = -calDF10((*conp)[0][i][j], (*temp)[i][j]);
+                        dF = -calDF10((*conp)[0][i][j], (*temp)[i][j], (*sij)[ii][jj]);
                     }
                     else if (ii % 2 == 0 && jj == 0)
                     {
-                        dF = calDF20((*conp)[0][i][j], (*temp)[i][j]);
+                        dF = calDF20((*conp)[0][i][j], (*temp)[i][j], (*sij)[ii][jj]);
                     }
                     else if (ii == 0 && jj % 2 == 0)
                     {
-                        dF = -calDF20((*conp)[0][i][j], (*temp)[i][j]);
+                        dF = -calDF20((*conp)[0][i][j], (*temp)[i][j], (*sij)[ii][jj]);
                     }
                     pddtt += -2.0 * (*mij)[ii][jj] / (double)((*phiNum)[i][j]) * (sum1 - 8.0 / PI * dF * sqrt((*phi)[ii][i][j] * (*phi)[jj][i][j]));
                 }
@@ -572,98 +649,14 @@ start:;
         }
     }
 
-    // moving termperature gradient
+    // cooling rate
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            (*temp)[i][j] -= DT / 20000.0;
+            (*temp)[i][j] -= DT / 10000.0;
         }
     }
-
-    // moving frame
-    // for (i = 0; i <= ndmx; i++)
-    // {
-    //     allSolid = 1;
-    //     for (j = 0; j <= ndmy; j++)
-    //     {
-    //         if ((*phi)[0][i][j] == 1.0)
-    //         {
-    //             allSolid = 0;
-    //             break;
-    //         }
-    //     }
-    //     if (allSolid == 1)
-    //     {
-    //         intpos = i;
-    //     }
-    //     else
-    //     {
-    //         break;
-    //     }
-    // }
-
-    // for (i = intpos; i <= ndmx; i++)
-    // {
-    //     allLiquid = 1;
-    //     for (j = 0; j <= ndmy; j++)
-    //     {
-    //         if ((*phi)[0][i][j] < 1.0)
-    //         {
-    //             allLiquid = 0;
-    //             break;
-    //         }
-    //     }
-    //     if (allLiquid == 1)
-    //     {
-    //         intpos = i;
-    //         break;
-    //     }
-    // }
-
-    // if (intpos > NDX / 2)
-    // {
-    //     dist = intpos - NDX / 2;
-    // }
-    // else
-    // {
-    //     dist = 0;
-    // }
-    // if (dist > 0)
-    // {
-    //     // cout << dist << endl;
-    //     for (i = 0; i <= (ndmx - dist); i++)
-    //     {
-    //         for (j = 0; j <= ndmy; j++)
-    //         {
-    //             for (kk = 0; kk <= nm; kk++)
-    //             {
-    //                 (*phi)[kk][i][j] = (*phi2)[kk][i + dist][j];
-    //                 (*conp)[kk][i][j] = (*conp)[kk][i + dist][j];
-    //                 (*cont)[i][j] = (*cont)[i + dist][j];
-    //             }
-    //             (*temp)[i][j] = (*temp)[i + dist][j];
-    //         }
-    //     }
-
-    //     for (i = (ndmx - dist + 1); i <= ndmx; i++)
-    //     {
-    //         for (j = 0; j <= ndmy; j++)
-    //         {
-    //             c1e = calC1e((*temp)[i][j]);
-    //             c2e = calC2e((*temp)[i][j]);
-    //             for (kk = 1; kk <= nm; kk++)
-    //             {
-    //                 (*phi)[kk][i][j] = 0.0;
-    //                 (*conp)[kk][i][j] = (kk % 2 == 1) ? c1e : c2e;
-    //             }
-    //             (*phi)[0][i][j] = 1.0;
-    //             (*conp)[0][i][j] = (*cont)[ndmx - dist][j];
-    //             (*cont)[i][j] = (*conp)[0][i][j];
-    //             (*temp)[i][j] = (*temp)[ndmx - dist][j] + gradT * (i - ndmx + dist);
-    //         }
-    //     }
-    // }
 
     istep = istep + 1;
     if (istep < nstep)
@@ -719,20 +712,20 @@ double calC2e(double temp0)
     return c2e;
 }
 
-double calDF10(double con0, double temp0)
+double calDF10(double con0, double temp0, double dS)
 {
     double Te = 0.0;
     double ce = 0.5;
     double ml1 = -10.0;
-    double DF = ((con0 - ce) * ml1 + Te - temp0) * 0.5;
+    double DF = ((con0 - ce) * ml1 + Te - temp0) * dS;
     return DF;
 }
 
-double calDF20(double con0, double temp0)
+double calDF20(double con0, double temp0, double dS)
 {
     double Te = 0.0;
     double ce = 0.5;
     double ml2 = 10.0;
-    double DF = ((con0 - ce) * ml2 + Te - temp0) * 0.5;
+    double DF = ((con0 - ce) * ml2 + Te - temp0) * dS;
     return DF;
 }

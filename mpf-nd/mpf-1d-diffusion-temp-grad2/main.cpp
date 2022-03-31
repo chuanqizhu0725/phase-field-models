@@ -10,51 +10,46 @@
 
 using namespace std;
 
-#define N 2
+#define N 3
 #define ND 100
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
 
-int nstep = 10001;
-int pstep = 1000;
+int nstep = 6401;
+int pstep = 400;
 
 double dx = 1.0;
-double dtime = 0.05;
+double dtime = 0.02;
 double gamma0 = 0.5;
 double mobi = 1.0;
-double delta = 7.0 * dx;
+double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double F0 = 0.5;
+double S0 = 0.5;
 
-double Dl = 2.0;
+double Dl = 5.0;
 double Ds = 0.01;
 
-double temp = 2.0;
-double cl = 0.15;
-
-// Linear phae diagram
-double Te = 0.0;
-double ce = 0.5;
-double ml1 = -10.0;
-double kap1 = 0.2;
-double c01e = ce + (temp - Te) / ml1;
-double c1e = c01e * kap1;
+double temp0 = 1.0;
+double gradT = 0.01;
+double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 
 double phi[N][ND], phi2[N][ND];
 double con[ND], con2[ND], cons[ND], conl[ND];
+double temp[ND];
 
 int phinum;
 int phiNum[ND];
 int phiIdx[N + 1][ND];
 
 double c0, dc0, cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+double cm0, dcm0, icount, lcount;
 
 int i, j, im, ip, k;
 int ii, jj, kk;
@@ -65,6 +60,8 @@ double dF, pddtt, sum1;
 double termiikk, termjjkk;
 
 void datasave(int step);
+double calC01e(double temp0), calC1e(double temp0), calC02e(double temp0), calC2e(double temp0);
+double calDF10(double con0, double temp0, double dS), calDF20(double con0, double temp0, double dS);
 
 int main(void)
 {
@@ -72,7 +69,6 @@ int main(void)
     cout << "Computation Started!" << endl;
     cout << "concenration field stablity number is: " << dtime * Dl / dx / dx << endl;
     cout << "phase field stability number is: " << dtime / dx / dx * mobi * A0 << endl;
-    // cout << "unpper limit of driving force is: " << delta / dtime / mobi / PI << endl;
 
     for (i = 0; i <= nm; i++)
     {
@@ -81,35 +77,34 @@ int main(void)
             wij[i][j] = W0;
             aij[i][j] = A0;
             mij[i][j] = M0;
-            fij[i][j] = F0;
             if (i == j)
             {
                 wij[i][j] = 0.0;
                 aij[i][j] = 0.0;
                 mij[i][j] = 0.0;
-                fij[i][j] = 0.0;
-            }
-            if (i < j)
-            {
-                fij[i][j] = -fij[i][j];
             }
         }
+    }
+
+    for (i = 0; i <= ndm; i++)
+    {
+        temp[i] = temp0 + gradT * i;
     }
 
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
-        if (i <= ND / 8)
+        if (i <= ND / 4)
         {
             phi[1][i] = 1.0;
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             phi[0][i] = 0.0;
-            conl[i] = c01e;
+            conl[i] = calC01e(temp[i]);
         }
         else
         {
             phi[1][i] = 0.0;
-            cons[i] = c1e;
+            cons[i] = calC1e(temp[i]);
             phi[0][i] = 1.0;
             conl[i] = cl;
         }
@@ -117,6 +112,7 @@ int main(void)
         sum1 += con[i];
     }
     c0 = sum1 / ND;
+    cm0 = sum1;
 
 start:;
 
@@ -124,6 +120,7 @@ start:;
     {
         datasave(istep);
         cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
+        cout << "The nominal concnetration is " << c0 << endl;
     }
 
     for (i = 0; i <= ndm; i++)
@@ -186,11 +183,11 @@ start:;
                 }
                 if (ii == 1 && jj == 0)
                 {
-                    dF = ((conl[i] - ce) * ml1 + Te - temp) * 0.5;
+                    dF = calDF10(conl[i], temp[i], S0);
                 }
                 else if (ii == 0 && jj == 1)
                 {
-                    dF = -(((conl[i] - ce) * ml1 + Te - temp)) * 0.5;
+                    dF = -calDF10(conl[i], temp[i], S0);
                 }
                 else
                 {
@@ -234,20 +231,37 @@ start:;
 
     for (i = 0; i <= ndm; i++)
     {
-        cons[i] = c1e;
-        if (phi[0][i] > 0.0)
+        if (phi[0][i] == 0.0)
         {
+            conl[i] = calC01e(temp[i]);
+        }
+        else if (phi[0][i] > 0.0 && phi[0][i] < 1.0)
+        {
+            cons[i] = calC1e(temp[i]);
             conl[i] = (con[i] - cons[i] * phi[1][i]) / phi[0][i];
-            if (conl[i] > c01e)
+            if (conl[i] > 1.0)
             {
-                conl[i] = c01e;
+                conl[i] = 1.0;
+            }
+            if (conl[i] < 0.0)
+            {
+                conl[i] = 0.0;
             }
         }
-        else if (phi[0][i] == 0.0)
+        else if (phi[0][i] == 1.0)
         {
+            cons[i] = calC1e(temp[i]);
             conl[i] = con[i];
         }
         con[i] = cons[i] * phi[1][i] + conl[i] * phi[0][i];
+        if (con[i] > 1.0)
+        {
+            con[i] = 1.0;
+        }
+        if (con[i] < 0.0)
+        {
+            con[i] = 0.0;
+        }
     }
 
     // Evolution Equation of Concentration field
@@ -276,26 +290,50 @@ start:;
 
     for (i = 0; i <= ndm; i++)
     {
-        con[i] = con2[i]; //補助配列を主配列に移動（濃度場）
+        con[i] = con2[i];
     }
 
-    //*** 濃度場の収支補正 *************************************************************
     sum1 = 0.0;
     for (i = 0; i <= ndm; i++)
     {
         sum1 += con[i];
     }
-    dc0 = sum1 / ND - c0;
+    c0 = sum1 / ND;
+    dcm0 = sum1 - cm0;
+    sum1 = 0.0;
+    lcount = 0.0;
+    // collect mass in liquid
     for (i = 0; i <= ndm; i++)
     {
-        con[i] = con[i] - dc0;
-        if (con[i] > 1.0)
+        if (phi[0][i] > 0.0)
         {
-            con[i] = 1.0;
+            sum1 += con[i];
+            lcount += 1.0;
         }
-        if (con[i] < 0.0)
+    }
+    // correction for mass conservation
+    for (i = 0; i <= ndm; i++)
+    {
+        if (phi[0][i] > 0.0)
         {
-            con[i] = 0.0;
+            conl[i] = conl[i] - dcm0 / lcount * phi[0][i];
+            con[i] = con[i] - dcm0 / lcount * phi[0][i];
+            if (con[i] > 1.0)
+            {
+                con[i] = 1.0;
+            }
+            if (con[i] < 0.0)
+            {
+                con[i] = 0.0;
+            }
+            if (conl[i] > 1.0)
+            {
+                conl[i] = 1.0;
+            }
+            if (conl[i] < 0.0)
+            {
+                conl[i] = 0.0;
+            }
         }
     }
 
@@ -335,4 +373,90 @@ void datasave(int step)
         fprintf(streamc, "\n");
     }
     fclose(streamc); //ファイルをクローズ
+
+    FILE *streamcl; //ストリームのポインタ設定
+    char buffercl[30];
+    sprintf(buffercl, "data/conl/1d%d.csv", step);
+    streamcl = fopen(buffercl, "a"); //書き込む先のファイルを追記方式でオープン
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcl, "%e   ", conl[i]);
+        fprintf(streamcl, "\n");
+    }
+    fclose(streamcl); //ファイルをクローズ
+
+    FILE *streamcs; //ストリームのポインタ設定
+    char buffercs[30];
+    sprintf(buffercs, "data/cons/1d%d.csv", step);
+    streamcs = fopen(buffercs, "a"); //書き込む先のファイルを追記方式でオープン
+
+    for (int i = 0; i <= ndm; i++)
+    {
+        fprintf(streamcs, "%e   ", cons[i]);
+        fprintf(streamcs, "\n");
+    }
+    fclose(streamcs); //ファイルをクローズ
+}
+
+double calC01e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double kap1 = 0.2;
+    double c01e;
+    c01e = ce + (temp0 - Te) / ml1;
+    return c01e;
+}
+
+double calC1e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double kap1 = 0.2;
+    double c1e;
+    c1e = (ce + (temp0 - Te) / ml1) * kap1;
+    return c1e;
+}
+
+double calC02e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double kap2 = 0.2;
+    double c02e;
+    c02e = ce + (temp0 - Te) / ml2;
+    return c02e;
+}
+
+double calC2e(double temp0)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double kap2 = 0.2;
+    double c2e;
+    c2e = 1.0 - (1.0 - (ce + (temp0 - Te) / ml2)) * kap2;
+    return c2e;
+}
+
+double calDF10(double con0, double temp0, double dS)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml1 = -10.0;
+    double DF = ((con0 - ce) * ml1 + Te - temp0) * dS;
+    return DF;
+}
+
+double calDF20(double con0, double temp0, double dS)
+{
+    double Te = 0.0;
+    double ce = 0.5;
+    double ml2 = 10.0;
+    double DF = ((con0 - ce) * ml2 + Te - temp0) * dS;
+    return DF;
 }

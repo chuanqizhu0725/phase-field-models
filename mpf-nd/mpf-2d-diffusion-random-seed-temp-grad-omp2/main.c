@@ -5,9 +5,9 @@
 #include <math.h>
 #include <omp.h>
 
-#define N 5
-#define NDX 64
-#define NDY 64
+#define N 2
+#define NDX 128
+#define NDY 128
 #define NTH 8
 #define PI 3.14159
 
@@ -31,10 +31,10 @@ double Dl = 5.0;
 double Ds = 0.01;
 
 double DT = 0.0;
-double temp0 = -1.0;
-double gradT = 0.00;
-// double cl = 0.2;
-double cl = 0.5;
+double temp0 = 2.0;
+double gradT = 0.01;
+double cl = 0.2;
+// double cl = 0.5;
 
 double sum0, lcount;
 int fcount = 0;
@@ -116,7 +116,7 @@ int main(void)
             }
         }
     }
-    r0 = 5.0;
+    r0 = 15.0;
     for (k = 1; k <= nm; k++)
     {
         x00 = rand() % NDX;
@@ -421,14 +421,14 @@ int main(void)
                 c2e = calC2e((*temp)[ix][iy]);
                 c01e = calC01e((*temp)[ix][iy]);
                 c02e = calC02e((*temp)[ix][iy]);
-                for (kk = 1; kk <= (*phiNum)[ix][iy]; kk++)
-                {
-                    n1 = (*phiIdx)[kk][ix][iy];
-                    if (n1 != 0)
-                    {
-                        (*conp)[n1][ix][iy] = (n1 % 2 == 1) ? c1e : c2e;
-                    }
-                }
+                // for (kk = 1; kk <= (*phiNum)[ix][iy]; kk++)
+                // {
+                //     n1 = (*phiIdx)[kk][ix][iy];
+                //     if (n1 != 0)
+                //     {
+                //         (*conp)[n1][ix][iy] = (n1 % 2 == 1) ? c1e : c2e;
+                //     }
+                // }
                 if ((*phi)[0][ix][iy] == 0.0)
                 {
                     (*conp)[0][ix][iy] = 0.0;
@@ -443,6 +443,14 @@ int main(void)
                 }
                 else if ((*phi)[0][ix][iy] > 0.0 && (*phi)[0][ix][iy] < 1.0)
                 {
+                    for (kk = 1; kk <= (*phiNum)[ix][iy]; kk++)
+                    {
+                        n1 = (*phiIdx)[kk][ix][iy];
+                        if (n1 != 0)
+                        {
+                            (*conp)[n1][ix][iy] = (n1 % 2 == 1) ? c1e : c2e;
+                        }
+                    }
                     sum1 = (*cont)[ix][iy];
                     for (kk = 1; kk <= (*phiNum)[ix][iy]; kk++)
                     {
@@ -540,6 +548,7 @@ int main(void)
 #pragma omp barrier
         if (th_id == 0 && fcount == NTH)
         {
+            // correction for mass conservation
             for (ix = 0; ix <= ndmx; ix++)
             {
                 for (iy = 0; iy <= ndmy; iy++)
@@ -548,8 +557,7 @@ int main(void)
                     lcount += (*phi)[0][ix][iy];
                 }
             }
-            c0 = sum0 / NDX / NDY;
-            // correction for mass conservation
+
             for (ix = 0; ix <= ndmx; ix++)
             {
                 for (iy = 0; iy <= ndmy; iy++)
@@ -577,9 +585,12 @@ int main(void)
                     }
                 }
             }
+            c0 = sum0 / NDX / NDY;
             sum0 = 0.0;
             lcount = 0.0;
             fcount = 0;
+
+            // moving frame
         }
 #pragma omp barrier
 
