@@ -12,11 +12,14 @@ using namespace std;
 #define N 2
 #define NTH 4
 #define ND 128
+#define NDL 1280
 #define PI 3.14159
 
 int nm = N - 1;
 int ndm = ND - 1;
+int ndml = NDL - 1;
 int rows = ND / NTH;
+int rowsl = NDL / NTH;
 
 int nstep = 200001;
 int pstep = 2000;
@@ -35,14 +38,15 @@ double S0 = 0.5;
 double Dl = 5.0;
 double Ds = 0.01;
 
-double temp0 = 2.00;
-double gradT = 0.00;
-double dts = 0.00 / nstep;
+double temp0 = 1.0;
+double gradT = 0.01;
+double dts = 0.50 / nstep;
 double cl = 0.2;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][ND], phi2[N][ND];
 double cont[ND], cont2[ND], conp[N][ND];
+double conlr[NDL], conlr2[NDL];
 double temp[ND];
 int phiNum[ND];
 int phiIdx[N + 1][ND];
@@ -108,6 +112,12 @@ int main(void)
         sum0 += cont[i];
     }
     c0 = sum0 / ND;
+    // c0 = (sum0 + ND * 10 * cl) / (11 * ND);
+    // Long range field
+    for (i = 0; i <= ndml; i++)
+    {
+        conlr[i] = cl;
+    }
     for (i = 0; i <= ndm; i++)
     {
         ip = i + 1;
@@ -138,20 +148,26 @@ int main(void)
     {
         int istep, th_id;
         int start, end, offset;
+        int startl, endL, offsetl;
         int ix, ixm, ixp, iy, iym, iyp, ik, ikm, ikp;
         int ii, jj, kk;
         int n1, n2, n3, phinum;
 
-        double cddtt, dev1_s, dev2_s, dev1_l, dev2_l;
+        double cddtt, conixp, dev1_s, dev2_s, dev1_l, dev2_l;
 
         double dF, pddtt, psum, dsum;
         double termiikk, termjjkk;
 
+        istep = 0;
         th_id = omp_get_thread_num();
+
         offset = th_id * rows;
         start = offset;
         end = offset + rows - 1;
-        istep = 0;
+
+        offsetl = th_id * rowsl;
+        startl = offsetl;
+        endL = offsetl + rowsl - 1;
 
     start:;
 
@@ -162,7 +178,6 @@ int main(void)
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
             cout << "The nominal concnetration is " << c00 << endl;
-            cout << "The th_id is " << th_id << endl;
         }
 
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
@@ -340,20 +355,20 @@ int main(void)
                 sum0 += cont[ix];
             }
             c00 = sum0 / ND;
-            dc0 = sum0 / ND - c0;
+            // dc0 = sum0 / ND - c0;
             // correction for mass conservation in the interface region
-            for (ix = 0; ix <= ndm; ix++)
-            {
-                cont[ix] = cont[ix] - dc0;
-                if (cont[ix] > 1.0)
-                {
-                    cont[ix] = 1.0;
-                }
-                if (cont[ix] < 0.0)
-                {
-                    cont[ix] = 0.0;
-                }
-            }
+            // for (ix = 0; ix <= ndm; ix++)
+            // {
+            //     cont[ix] = cont[ix] - dc0;
+            //     if (cont[ix] > 1.0)
+            //     {
+            //         cont[ix] = 1.0;
+            //     }
+            //     if (cont[ix] < 0.0)
+            //     {
+            //         cont[ix] = 0.0;
+            //     }
+            // }
         }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------
@@ -369,11 +384,19 @@ int main(void)
             {
                 ixm = 0;
             }
+            if (ix == ndm)
+            {
+                conixp = conlr[0];
+            }
+            else
+            {
+                conixp = conp[0][ixp];
+            }
             //拡散方程式内における微分計算
             dev1_s = 0.25 * ((phi[1][ixp] - phi[1][ixm]) * (conp[1][ixp] - conp[1][ixm])) / dx / dx;
-            dev1_l = 0.25 * ((phi[0][ixp] - phi[0][ixm]) * (conp[0][ixp] - conp[0][ixm])) / dx / dx;
+            dev1_l = 0.25 * ((phi[0][ixp] - phi[0][ixm]) * (conixp - conp[0][ixm])) / dx / dx;
             dev2_s = phi[1][ix] * (conp[1][ixp] + conp[1][ixm] - 2.0 * conp[1][ix]) / dx / dx;
-            dev2_l = phi[0][ix] * (conp[0][ixp] + conp[0][ixm] - 2.0 * conp[0][ix]) / dx / dx;
+            dev2_l = phi[0][ix] * (conixp + conp[0][ixm] - 2.0 * conp[0][ix]) / dx / dx;
 
             cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
             cont2[ix] = cont[ix] + cddtt * dtime;                    //濃度場の時間発展(陽解法)
@@ -390,9 +413,28 @@ int main(void)
         {
             temp[ix] -= dts;
         }
+#pragma omp barrier
         // --------------------------------  Long-range solute diffusion calculation -----------------------------------
-
-        // ----------------------------------------------  Moving frame  -----------------------------------------------
+        for (ix = startl; ix <= endL; ix++)
+        {
+            if (ix == 0)
+            {
+                conlr2[ix] = conlr[ix] + dtime * Dl * (conlr[ix + 1] + cont[ndm] - 2.0 * conlr[ix]) / (dx * dx);
+            }
+            else if (ix == ndml)
+            {
+                conlr2[ix] = conlr[ix] + dtime * Dl * (conlr[ix] + conlr[ix - 1] - 2.0 * conlr[ix]) / (dx * dx);
+            }
+            else
+            {
+                conlr2[ix] = conlr[ix] + dtime * Dl * (conlr[ix + 1] + conlr[ix - 1] - 2.0 * conlr[ix]) / (dx * dx);
+            }
+        }
+        for (ix = startl; ix <= endL; ix++)
+        {
+            conlr[ix] = conlr2[ix];
+        }
+//         // ----------------------------------------------  Moving frame  -----------------------------------------------
 #pragma omp barrier
         if (th_id == 0)
         {
@@ -445,7 +487,6 @@ int main(void)
             if (intpos > ND / 4)
             {
                 dist = intpos - ND / 4;
-                cout << "The dist is " << dist << endl;
                 for (ix = 0; ix <= (ndm - dist); ix++)
                 {
                     // temp
