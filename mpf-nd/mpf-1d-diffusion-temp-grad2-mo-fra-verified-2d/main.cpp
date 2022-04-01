@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define N 2
+#define N 3
 #define NTH 4
 #define NDX 128
 #define NDY 128
@@ -23,7 +23,7 @@ int ndml = NDL - 1;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 20001;
+int nstep = 10001;
 int pstep = 1000;
 
 double dx = 1.0;
@@ -43,7 +43,7 @@ double Ds = 0.001;
 double temp0 = 2.0;
 double gradT = 0.00;
 double dts = 0.00 / nstep;
-double cl = 0.2;
+double cl = 0.8;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][NDX][NDY], phi2[N][NDX][NDY];
@@ -103,19 +103,23 @@ int main(void)
         {
             if (i <= NDX / 16)
             {
-                phi[1][i][j] = 1.0;
+                phi[1][i][j] = 0.0;
                 conp[1][i][j] = calC1e(temp[i][j]);
+                phi[2][i][j] = 1.0;
+                conp[2][i][j] = calC2e(temp[i][j]);
                 phi[0][i][j] = 0.0;
-                conp[0][i][j] = calC01e(temp[i][j]);
+                conp[0][i][j] = calC02e(temp[i][j]);
             }
             else
             {
                 phi[1][i][j] = 0.0;
                 conp[1][i][j] = calC1e(temp[i][j]);
+                phi[2][i][j] = 0.0;
+                conp[2][i][j] = calC2e(temp[i][j]);
                 phi[0][i][j] = 1.0;
                 conp[0][i][j] = cl;
             }
-            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[0][i][j] * phi[0][i][j];
+            cont[i][j] = conp[1][i][j] * phi[1][i][j] + conp[2][i][j] * phi[2][i][j] + conp[0][i][j] * phi[0][i][j];
             sum0 += cont[i][j];
         }
     }
@@ -173,7 +177,7 @@ int main(void)
         int ii, jj, kk;
         int n1, n2, n3, phinum;
 
-        double cddtt, conixp, dev1_s, dev2_s, dev1_l, dev2_l;
+        double cddtt, sumcs, sumcl;
 
         double dF, pddtt, psum, dsum;
         double termiikk, termjjkk;
@@ -251,6 +255,14 @@ int main(void)
                         else if (ii == 0 && jj == 1)
                         {
                             dF = -calDF10(conp[0][ix][iy], temp[ix][iy], S0);
+                        }
+                        else if (ii == 2 && jj == 0)
+                        {
+                            dF = calDF20(conp[0][ix][iy], temp[ix][iy], S0);
+                        }
+                        else if (ii == 0 && jj == 2)
+                        {
+                            dF = -calDF20(conp[0][ix][iy], temp[ix][iy], S0);
                         }
                         else
                         {
@@ -367,22 +379,25 @@ int main(void)
                 }
                 if (phi[0][ix][iy] == 0.0)
                 {
-                    conp[1][ix][iy] = cont[ix][iy];
+                    conp[1][ix][iy] = cont[ix][iy] * phi[1][ix][iy];
+                    conp[2][ix][iy] = cont[ix][iy] * phi[2][ix][iy];
                     // Correct abnormal calculation at solid edge
                     if ((phi[0][ixp][iy] > 0.0) || (phi[0][ixm][iy] > 0.0) || (phi[0][ix][iyp] > 0.0) || (phi[0][ix][iym] > 0.0))
                     {
                         conp[1][ix][iy] = calC1e(temp[ix][iy]);
+                        conp[2][ix][iy] = calC2e(temp[ix][iy]);
                     }
-                    conp[0][ix][iy] = calC01e(temp[ix][iy]);
+                    conp[0][ix][iy] = calC01e(temp[ix][iy]) * phi[1][ix][iy] + calC02e(temp[ix][iy]) * phi[2][ix][iy];
                 }
                 else if (phi[0][ix][iy] > 0.0 && phi[0][ix][iy] < 1.0)
                 {
                     conp[1][ix][iy] = calC1e(temp[ix][iy]);
-                    conp[0][ix][iy] = (cont[ix][iy] - conp[1][ix][iy] * phi[1][ix][iy]) / phi[0][ix][iy];
+                    conp[2][ix][iy] = calC2e(temp[ix][iy]);
+                    conp[0][ix][iy] = (cont[ix][iy] - conp[1][ix][iy] * phi[1][ix][iy] - conp[2][ix][iy] * phi[2][ix][iy]) / phi[0][ix][iy];
                     // Correct abnormal calculation at liquid edge
                     if (phi[0][ix][iy] < 0.05)
                     {
-                        conp[0][ix][iy] = calC01e(temp[ix][iy]);
+                        conp[0][ix][iy] = (calC01e(temp[ix][iy]) * phi[1][ix][iy] + calC02e(temp[ix][iy]) * phi[2][ix][iy]) / (phi[1][ix][iy] + phi[2][ix][iy]);
                     }
                     if (conp[0][ix][iy] > 1.0)
                     {
@@ -396,9 +411,10 @@ int main(void)
                 else if (phi[0][ix][iy] == 1.0)
                 {
                     conp[1][ix][iy] = calC1e(temp[ix][iy]);
+                    conp[2][ix][iy] = calC2e(temp[ix][iy]);
                     conp[0][ix][iy] = cont[ix][iy];
                 }
-                cont[ix][iy] = conp[1][ix][iy] * phi[1][ix][iy] + conp[0][ix][iy] * phi[0][ix][iy];
+                cont[ix][iy] = conp[1][ix][iy] * phi[1][ix][iy] + conp[2][ix][iy] * phi[2][ix][iy] + conp[0][ix][iy] * phi[0][ix][iy];
                 if (cont[ix][iy] > 1.0)
                 {
                     cont[ix][iy] = 1.0;
@@ -451,14 +467,14 @@ int main(void)
                     iym = ndmy;
                 }
                 //拡散方程式内における微分計算
-                dev1_s = 0.25 * ((phi[1][ixp][iy] - phi[1][ixm][iy]) * (conp[1][ixp][iy] - conp[1][ixm][iy]) + (phi[1][ix][iyp] - phi[1][ix][iym]) * (conp[1][ix][iyp] - conp[1][ix][iym])) / dx / dx;
-                dev1_l = 0.25 * ((phi[0][ixp][iy] - phi[0][ixm][iy]) * (conp[0][ixp][iy] - conp[0][ixm][iy]) + (phi[0][ix][iyp] - phi[0][ix][iym]) * (conp[0][ix][iyp] - conp[0][ix][iym])) / dx / dx;
-                dev2_s = phi[1][ix][iy] * (conp[1][ixp][iy] + conp[1][ixm][iy] + conp[1][ix][iyp] + conp[1][ix][iym] - 4.0 * conp[1][ix][iy]) / dx / dx;
-                dev2_l = phi[0][ix][iy] * (conp[0][ixp][iy] + conp[0][ixm][iy] + conp[0][ix][iyp] + conp[0][ix][iym] - 4.0 * conp[0][ix][iy]) / dx / dx;
-
-                cddtt = Ds * (dev1_s + dev2_s) + Dl * (dev1_l + dev2_l); //拡散方程式[式(4.42)]
-                cont2[ix][iy] = cont[ix][iy] + cddtt * dtime;            //濃度場の時間発展(陽解法)
-                                                                         // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+                for (ii = 1; ii < nm; ii++)
+                {
+                    sumcs = 0.25 * ((phi[ii][ixp][iy] - phi[ii][ixm][iy]) * (conp[ii][ixp][iy] - conp[ii][ixm][iy]) + (phi[ii][ix][iyp] - phi[ii][ix][iym]) * (conp[ii][ix][iyp] - conp[ii][ix][iym])) / dx / dx + phi[ii][ix][iy] * (conp[ii][ixp][iy] + conp[ii][ixm][iy] + conp[ii][ix][iyp] + conp[ii][ix][iym] - 4.0 * conp[ii][ix][iy]) / dx / dx;
+                }
+                sumcl = 0.25 * ((phi[0][ixp][iy] - phi[0][ixm][iy]) * (conp[0][ixp][iy] - conp[0][ixm][iy]) + (phi[0][ix][iyp] - phi[0][ix][iym]) * (conp[0][ix][iyp] - conp[0][ix][iym])) / dx / dx + phi[0][ix][iy] * (conp[0][ixp][iy] + conp[0][ixm][iy] + conp[0][ix][iyp] + conp[0][ix][iym] - 4.0 * conp[0][ix][iy]) / dx / dx;
+                cddtt = Ds * sumcs + Dl * sumcl;
+                cont2[ix][iy] = cont[ix][iy] + cddtt * dtime;
+                // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
             }
         }
 
