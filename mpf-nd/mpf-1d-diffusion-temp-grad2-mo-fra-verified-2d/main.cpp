@@ -40,10 +40,10 @@ double S0 = 0.5;
 double Dl = 1.0;
 double Ds = 0.001;
 
-double temp0 = 2.0;
+double temp0 = -0.5;
 double gradT = 0.00;
 double dts = 0.00 / nstep;
-double cl = 0.8;
+double cl = 0.5;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][NDX][NDY], phi2[N][NDX][NDY];
@@ -101,7 +101,18 @@ int main(void)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            if (i <= NDX / 16)
+            // if (i < NDX / 2)
+            if (i <= NDX / 16 && j < NDY / 2)
+            {
+                phi[1][i][j] = 1.0;
+                conp[1][i][j] = calC1e(temp[i][j]);
+                phi[2][i][j] = 0.0;
+                conp[2][i][j] = calC2e(temp[i][j]);
+                phi[0][i][j] = 0.0;
+                conp[0][i][j] = calC01e(temp[i][j]);
+            }
+            // else
+            else if (i <= NDX / 16 && j >= NDY / 2)
             {
                 phi[1][i][j] = 0.0;
                 conp[1][i][j] = calC1e(temp[i][j]);
@@ -215,11 +226,11 @@ int main(void)
                 iym = iy - 1;
                 if (ix == ndmx)
                 {
-                    ixp = 0;
+                    ixp = ndmx;
                 }
                 if (ix == 0)
                 {
-                    ixm = ndmx;
+                    ixm = 0;
                 }
                 if (iy == ndmy)
                 {
@@ -323,11 +334,11 @@ int main(void)
                 iym = iy - 1;
                 if (ix == ndmx)
                 {
-                    ixp = 0;
+                    ixp = ndmx;
                 }
                 if (ix == 0)
                 {
-                    ixm = ndmx;
+                    ixm = 0;
                 }
                 if (iy == ndmy)
                 {
@@ -363,11 +374,11 @@ int main(void)
                 iym = iy - 1;
                 if (ix == ndmx)
                 {
-                    ixp = 0;
+                    ixp = ndmx;
                 }
                 if (ix == 0)
                 {
-                    ixm = ndmx;
+                    ixm = 0;
                 }
                 if (iy == ndmy)
                 {
@@ -379,8 +390,22 @@ int main(void)
                 }
                 if (phi[0][ix][iy] == 0.0)
                 {
-                    conp[1][ix][iy] = cont[ix][iy] * phi[1][ix][iy];
-                    conp[2][ix][iy] = cont[ix][iy] * phi[2][ix][iy];
+                    if (phi[1][ix][iy] == 1.0)
+                    {
+                        conp[1][ix][iy] = cont[ix][iy];
+                    }
+                    else
+                    {
+                        conp[1][ix][iy] = calC1e(temp[ix][iy]);
+                    }
+                    if (phi[2][ix][iy] == 1.0)
+                    {
+                        conp[2][ix][iy] = cont[ix][iy];
+                    }
+                    else
+                    {
+                        conp[2][ix][iy] = calC2e(temp[ix][iy]);
+                    }
                     // Correct abnormal calculation at solid edge
                     if ((phi[0][ixp][iy] > 0.0) || (phi[0][ixm][iy] > 0.0) || (phi[0][ix][iyp] > 0.0) || (phi[0][ix][iym] > 0.0))
                     {
@@ -452,11 +477,11 @@ int main(void)
                 iym = iy - 1;
                 if (ix == ndmx)
                 {
-                    ixp = 0;
+                    ixp = ndmx;
                 }
                 if (ix == 0)
                 {
-                    ixm = ndmx;
+                    ixm = 0;
                 }
                 if (iy == ndmy)
                 {
