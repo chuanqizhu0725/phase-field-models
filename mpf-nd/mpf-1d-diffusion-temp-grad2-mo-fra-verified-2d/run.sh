@@ -1,0 +1,1 @@
+g++ -fopenmp main.cpp -o main && rm -f data/temp/*.csv data/conl/*.csv data/cons/*.csv data/phi/*.csv figures/phi/*.png data/con/*.csv figures/con/*.png && ./main && python plot.py && rm main
