@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 ns = 1000
-nx = ny = 128
-step_arr = np.arange(0, ns*21, ns)
+nx = ny = 64
+step_arr = np.arange(0, ns*31, ns)
 for step in step_arr:
     df = pd.read_csv(f"data/phi/2d{step}.csv", header=None)
     arr = df[0].values

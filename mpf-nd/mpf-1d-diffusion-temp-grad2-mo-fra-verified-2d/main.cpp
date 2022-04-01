@@ -10,9 +10,9 @@
 using namespace std;
 
 #define N 3
-#define NTH 4
-#define NDX 128
-#define NDY 128
+#define NTH 8
+#define NDX 64
+#define NDY 64
 #define NDL 2560
 #define PI 3.14159
 
@@ -20,10 +20,11 @@ int nm = N - 1;
 int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 int ndml = NDL - 1;
+int mid = NDX / 2;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 10001;
+int nstep = 30001;
 int pstep = 1000;
 
 double dx = 1.0;
@@ -37,12 +38,12 @@ double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double S0 = 0.5;
 
-double Dl = 1.0;
+double Dl = 5.0;
 double Ds = 0.001;
 
 double temp0 = -0.5;
-double gradT = 0.00;
-double dts = 0.00 / nstep;
+double gradT = 0.02;
+double dts = 1.0 / nstep;
 double cl = 0.5;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
@@ -63,7 +64,7 @@ int main(void)
     int i, j, k, im, ip, jm, jp, km, kp;
     int ni, phinum0;
     int intpos, dist, hasS, allS, allL;
-    double c0, c00, dc0, sum0;
+    double c0, c00, dc0, sum0, sumline;
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
@@ -517,6 +518,109 @@ int main(void)
             for (iy = 0; iy <= ndmy; iy++)
             {
                 temp[ix][iy] -= dts;
+            }
+        }
+        //----------------------------------------------  Moving frame  -----------------------------------------------
+#pragma omp barrier
+        if (th_id == 0)
+        {
+            // check if the bottom is solid
+            sumline = 0.0;
+            for (iy = 0; iy <= ndmy; iy++)
+            {
+                if (phi[0][0][iy] != 0.0)
+                {
+                    hasS = 0;
+                }
+                sumline += phi[0][0][iy];
+                if ((sumline == 0.0) && (iy == ndmy))
+                {
+                    hasS = 1;
+                }
+            }
+            // search interface front
+            intpos = 0;
+            if (hasS == 1)
+            {
+                allS = 1;
+                for (ix = 0; ix <= ndmx; ix++)
+                {
+                    if (allS == 0)
+                    {
+                        intpos = ix - 1;
+                        break;
+                    }
+                    for (iy = 0; iy <= ndmy; iy++)
+                    {
+                        if (phi[0][ix][iy] > 0.0)
+                        {
+                            allS = 0;
+                            break;
+                        }
+                    }
+                }
+
+                allL = 0;
+                for (ix = intpos; ix <= ndmx; ix++)
+                {
+                    sumline = 0.0;
+                    for (iy = 0; iy <= ndmy; iy++)
+                    {
+                        sumline += phi[0][ix][iy];
+                    }
+                    if (sumline == double(NDY))
+                    {
+                        allL = 1;
+                    }
+                    if (allL == 1)
+                    {
+                        intpos = ix;
+                        break;
+                    }
+                }
+            }
+            // check the distance from the middle of the domain
+            if (intpos > mid)
+            {
+                dist = intpos - mid;
+                cout << "the thread which is moving frame is " << th_id << endl;
+                cout << "the distance away from middle is " << dist << endl;
+                for (ix = 0; ix <= (ndmx - dist); ix++)
+                {
+                    for (iy = 0; iy <= ndmy; iy++)
+                    {
+                        // temp
+                        temp[ix][iy] = temp[ix + dist][iy];
+                        // cont
+                        cont[ix][iy] = cont[ix + dist][iy];
+                        // phi
+                        phi[0][ix][iy] = phi[0][ix + dist][iy];
+                        phi[1][ix][iy] = phi[1][ix + dist][iy];
+                        phi[2][ix][iy] = phi[2][ix + dist][iy];
+                        // conp
+                        conp[0][ix][iy] = conp[0][ix + dist][iy];
+                        conp[1][ix][iy] = conp[1][ix + dist][iy];
+                        conp[2][ix][iy] = conp[2][ix + dist][iy];
+                    }
+                }
+                for (ix = (ndmx - dist + 1); ix <= ndmx; ix++)
+                {
+                    for (iy = 0; iy <= ndmy; iy++)
+                    {
+                        // temp
+                        temp[ix][iy] = temp[ndmx - dist][iy] + gradT * (ix - ndmx + dist);
+                        // cont
+                        cont[ix][iy] = cont[ndmx - dist][iy];
+                        // phi
+                        phi[0][ix][iy] = 1.0;
+                        phi[1][ix][iy] = 0.0;
+                        phi[2][ix][iy] = 0.0;
+                        // conp
+                        conp[0][ix][iy] = cont[ndmx - dist][iy];
+                        conp[1][ix][iy] = calC1e(temp[ix][iy]);
+                        conp[2][ix][iy] = calC2e(temp[ix][iy]);
+                    }
+                }
             }
         }
         istep = istep + 1;

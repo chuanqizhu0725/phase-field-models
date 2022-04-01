@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-nx = ny = 128
+nx = ny = 64
 df = pd.read_csv(f"data/con/2d10000.csv", header=None)
 arr = df.values
 mat = arr.reshape(nx, ny)
