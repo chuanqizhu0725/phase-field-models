@@ -12,7 +12,7 @@ using namespace std;
 #define N 3
 #define NTH 8
 #define NDX 64
-#define NDY 64
+#define NDY 32
 #define NDL 2560
 #define PI 3.14159
 
@@ -24,13 +24,14 @@ int mid = NDX / 2;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 30001;
-int pstep = 1000;
+int nstep = 50001;
+int pstep = 2000;
 
 double dx = 1.0;
-double dtime = 0.02;
+double dtime = 1.0;
+
 double gamma0 = 0.5;
-double mobi = 1.0;
+double mobi = 5.0e-2;
 double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
@@ -38,13 +39,16 @@ double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
 double S0 = 0.5;
 
-double Dl = 5.0;
-double Ds = 0.001;
+double Dl = 0.1;
+double Ds = 2.0e-4;
 
 double temp0 = -0.5;
 double gradT = 0.02;
-double dts = 1.0 / nstep;
+double Rc = 9.0e-6;
 double cl = 0.5;
+
+double alpha_d = dtime * Dl / dx / dx;
+double alpha_m = dtime / dx / dx * mobi * A0;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][NDX][NDY], phi2[N][NDX][NDY];
@@ -68,8 +72,14 @@ int main(void)
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
-    cout << "concenration field stablity number is: " << dtime * Dl / dx / dx << endl;
-    cout << "phase field stability number is: " << dtime / dx / dx * mobi * A0 << endl;
+    cout << "concenration field stablity number is: " << alpha_d << endl;
+    cout << "phase field stability number is: " << alpha_m << endl;
+
+    if ((alpha_d > 0.15) || (alpha_m > 0.15))
+    {
+        cout << "The computation is unstable, please change input parameters!" << endl;
+        goto terminal;
+    }
 
     // ---------------------------------  Initialization ------------------------------------
 
@@ -93,7 +103,7 @@ int main(void)
     {
         for (j = 0; j <= ndmy; j++)
         {
-            temp[i][j] = temp0 + gradT * i;
+            temp[i][j] = temp0 + gradT * i * dx;
         }
     }
 
@@ -103,7 +113,7 @@ int main(void)
         for (j = 0; j <= ndmy; j++)
         {
             // if (i < NDX / 2)
-            if (i <= NDX / 16 && j < NDY / 2)
+            if (i <= NDX / 3 && j < NDY / 2)
             {
                 phi[1][i][j] = 1.0;
                 conp[1][i][j] = calC1e(temp[i][j]);
@@ -113,7 +123,7 @@ int main(void)
                 conp[0][i][j] = calC01e(temp[i][j]);
             }
             // else
-            else if (i <= NDX / 16 && j >= NDY / 2)
+            else if (i <= NDX / 3 && j >= NDY / 2)
             {
                 phi[1][i][j] = 0.0;
                 conp[1][i][j] = calC1e(temp[i][j]);
@@ -517,7 +527,7 @@ int main(void)
         {
             for (iy = 0; iy <= ndmy; iy++)
             {
-                temp[ix][iy] -= dts;
+                temp[ix][iy] -= Rc * dtime;
             }
         }
         //----------------------------------------------  Moving frame  -----------------------------------------------
@@ -608,15 +618,15 @@ int main(void)
                     for (iy = 0; iy <= ndmy; iy++)
                     {
                         // temp
-                        temp[ix][iy] = temp[ndmx - dist][iy] + gradT * (ix - ndmx + dist);
+                        temp[ix][iy] = temp[ndmx - dist][iy] + gradT * (ix - ndmx + dist) * dx;
                         // cont
-                        cont[ix][iy] = cont[ndmx - dist][iy];
+                        cont[ix][iy] = cl;
                         // phi
                         phi[0][ix][iy] = 1.0;
                         phi[1][ix][iy] = 0.0;
                         phi[2][ix][iy] = 0.0;
                         // conp
-                        conp[0][ix][iy] = cont[ndmx - dist][iy];
+                        conp[0][ix][iy] = cl;
                         conp[1][ix][iy] = calC1e(temp[ix][iy]);
                         conp[2][ix][iy] = calC2e(temp[ix][iy]);
                     }
@@ -632,6 +642,7 @@ int main(void)
 
     end:;
     }
+terminal:;
     return 0;
 }
 
@@ -676,13 +687,10 @@ void datasave(int step)
 
     for (i = 0; i <= ndmx; i++)
     {
-        for (j = 0; j <= ndmy; j++)
-        {
-            fprintf(streamt, "%e   ", temp[i][j] / 10.0);
-            fprintf(streamt, "\n");
-        }
-        fclose(streamt); //ファイルをクローズ
+        fprintf(streamt, "%e   ", temp[i][0]);
+        fprintf(streamt, "\n");
     }
+    fclose(streamt); //ファイルをクローズ
 }
 
 double calC01e(double temp0)
