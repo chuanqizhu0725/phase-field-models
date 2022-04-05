@@ -11,8 +11,8 @@ using namespace std;
 
 #define N 3
 #define NTH 8
-#define NDX 64
-#define NDY 32
+#define NDX 128
+#define NDY 64
 #define NDL 2560
 #define PI 3.14159
 
@@ -30,21 +30,21 @@ int pstep = 2000;
 double dx = 1.0;
 double dtime = 1.0;
 
-double gamma0 = 0.5;
-double mobi = 5.0e-2;
+double gamma0 = 1.0;
+double mobi = 0.025;
 double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double S0 = 0.5;
+double S0 = 0.2;
 
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
-double temp0 = -0.5;
-double gradT = 0.02;
-double Rc = 9.0e-6;
+double temp0 = -0.9;
+double gradT = 0.002;    // G = dT/dx
+double rateT = 0.000002; // R = dT/dt, V = R/G ( ~ 1000 step / grid)
 double cl = 0.5;
 
 double alpha_d = dtime * Dl / dx / dx;
@@ -527,7 +527,7 @@ int main(void)
         {
             for (iy = 0; iy <= ndmy; iy++)
             {
-                temp[ix][iy] -= Rc * dtime;
+                temp[ix][iy] -= rateT * dtime;
             }
         }
         //----------------------------------------------  Moving frame  -----------------------------------------------
