@@ -30,19 +30,19 @@ int pstep = 2000;
 double dx = 1.0;
 double dtime = 1.0;
 
-double gamma0 = 1.0;
-double mobi = 0.025;
+double gamma0 = 0.1;
+double mobi = 0.25;
 double delta = 5.0 * dx;
 
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double S0 = 0.2;
+double S0 = 0.03;
 
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
-double temp0 = -0.9;
+double temp0 = -0.73;
 double gradT = 0.002;    // G = dT/dx
 double rateT = 0.000002; // R = dT/dt, V = R/G ( ~ 1000 step / grid)
 double cl = 0.5;
