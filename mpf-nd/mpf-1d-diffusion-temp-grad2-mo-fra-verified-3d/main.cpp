@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -6,14 +5,16 @@
 #include <iostream>
 #include <string>
 #include <omp.h>
+#include "CImg.h" //CImg ライブラリ（描画用）使用のためのヘッダ
 
 using namespace std;
+using namespace cimg_library;
 
 #define N 3
 #define NTH 8
-#define NDX 64
-#define NDY 64
-#define NDZ 64
+#define NDX 32
+#define NDY 32
+#define NDZ 32
 #define NDL 2560
 #define PI 3.14159
 
@@ -22,12 +23,12 @@ int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 int ndmz = NDZ - 1;
 int ndml = NDL - 1;
-int mid = NDX / 2;
+int mid = NDX / 4;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
 int nstep = 2001;
-int pstep = 200;
+int pstep = 2000;
 
 double dx = 1.0;
 double dtime = 1.0;
@@ -44,9 +45,9 @@ double S0 = 0.03;
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
-double temp0 = -0.5;
-double gradT = 0.000;
-double rateT = 0.000000;
+double temp0 = -0.4;
+double gradT = 0.002;
+double rateT = 0.000002;
 double cl = 0.5;
 
 double alpha_d = dtime * Dl / dx / dx;
@@ -60,6 +61,10 @@ double temp[NDX][NDY][NDZ];
 int phiNum[NDX][NDY][NDZ];
 int phiIdx[N + 1][NDX][NDY][NDZ];
 
+CImg<unsigned char> ch_fld(NDX, NDZ, 1, 3);
+char outFileCh_xz[64];
+char outFiles_xz[64];
+
 void datasave(int step);
 double calC01e(double temp0), calC1e(double temp0), calC02e(double temp0), calC2e(double temp0);
 double calDF10(double con0, double temp0, double dS), calDF20(double con0, double temp0, double dS);
@@ -70,7 +75,7 @@ int main(void)
     int i, j, k, im, ip, jm, jp, km, kp;
     int ni, phinum0;
     int intpos, dist, hasS, allS, allL;
-    double c0, c00, dc0, sum0, sumline;
+    double c0, c00, dc0, sum0, sumplane;
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
@@ -120,7 +125,7 @@ int main(void)
             for (k = 0; k <= ndmz; k++)
             {
 
-                if (((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < (NDX * NDX / (2.0 * PI))) && (k < NDZ / 4))
+                if ((i < NDX / 2) && (k < NDZ / 4))
                 {
                     phi[1][i][j][k] = 1.0;
                     conp[1][i][j][k] = calC1e(temp[i][j][k]);
@@ -129,7 +134,7 @@ int main(void)
                     phi[0][i][j][k] = 0.0;
                     conp[0][i][j][k] = calC01e(temp[i][j][k]);
                 }
-                else if ((((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) >= (NDX * NDX / (2.0 * PI))) && (k < NDZ / 4)))
+                else if ((i >= NDX / 2) && (k < NDZ / 4))
                 {
                     phi[1][i][j][k] = 0.0;
                     conp[1][i][j][k] = calC1e(temp[i][j][k]);
@@ -243,6 +248,15 @@ int main(void)
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
             cout << "The nominal concnetration is " << c00 << endl;
+            // ****** YZ *******
+            cimg_forXY(ch_fld, x, z)
+            {
+                ch_fld(x, z, 0) = 255. * (cont[x][NDY / 2][z]) / 0.7; // red
+                ch_fld(x, z, 1) = 255. * (cont[x][NDY / 2][z]) / 0.7; // green
+                ch_fld(x, z, 2) = 255. * (cont[x][NDY / 2][z]) / 0.7; // blue
+            }
+            sprintf(outFileCh_xz, "figures/con/2d%d.png", istep); // generate imagefile
+            ch_fld.save_jpeg(outFileCh_xz);                       // save imagegilee
         }
 
         // ---------------------------------  Evolution Equation of Phase fields ------------------------------------
@@ -646,6 +660,129 @@ int main(void)
                 }
             }
         }
+
+        //----------------------------------------------  Moving frame  -----------------------------------------------
+#pragma omp barrier
+        if (th_id == 0)
+        {
+            // check if the bottom is solid
+            sumplane = 0.0;
+            for (ix = 0; ix <= ndmx; ix++)
+            {
+                for (iy = 0; iy <= ndmy; iy++)
+                {
+                    if (phi[0][ix][iy][0] != 0.0)
+                    {
+                        hasS = 0;
+                    }
+                    sumplane += phi[0][ix][iy][0];
+                    if ((sumplane == 0.0) && (iy == ndmy) && (ix == ndmx))
+                    {
+                        hasS = 1;
+                    }
+                }
+            }
+            // search interface front
+            intpos = 0;
+            if (hasS == 1)
+            {
+                allS = 1;
+                for (iz = 0; iz <= ndmz; iz++)
+                {
+                    if (allS == 0)
+                    {
+                        intpos = iz - 1;
+                        break;
+                    }
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            if (phi[0][ix][iy][iz] > 0.0)
+                            {
+                                allS = 0;
+                                break;
+                            }
+                        }
+                        if (allS == 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                allL = 0;
+                for (iz = intpos; iz <= ndmx; iz++)
+                {
+                    sumplane = 0.0;
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            sumplane += phi[0][ix][iy][iz];
+                        }
+                    }
+                    if (sumplane == double(NDX * NDY))
+                    {
+                        allL = 1;
+                    }
+                    if (allL == 1)
+                    {
+                        intpos = iz;
+                        break;
+                    }
+                }
+            }
+            // check the distance from the middle of the domain
+            if (intpos > mid)
+            {
+                dist = intpos - mid;
+                cout << "the thread which is moving frame is " << th_id << endl;
+                cout << "the distance away from middle is " << dist << endl;
+                for (iz = 0; iz <= (ndmz - dist); iz++)
+                {
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            // temp
+                            temp[ix][iy][iz] = temp[ix][iy][iz + dist];
+                            // cont
+                            cont[ix][iy][iz] = cont[ix][iy][iz + dist];
+                            // phi
+                            phi[0][ix][iy][iz] = phi[0][ix][iy][iz + dist];
+                            phi[1][ix][iy][iz] = phi[1][ix][iy][iz + dist];
+                            phi[2][ix][iy][iz] = phi[2][ix][iy][iz + dist];
+                            // conp
+                            conp[0][ix][iy][iz] = conp[0][ix][iy][iz + dist];
+                            conp[1][ix][iy][iz] = conp[1][ix][iy][iz + dist];
+                            conp[2][ix][iy][iz] = conp[2][ix][iy][iz + dist];
+                        }
+                    }
+                }
+                for (iz = (ndmz - dist + 1); iz <= ndmz; iz++)
+                {
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            // temp
+                            temp[ix][iy][iz] = temp[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
+                            // cont
+                            cont[ix][iy][iz] = cl;
+                            // phi
+                            phi[0][ix][iy][iz] = 1.0;
+                            phi[1][ix][iy][iz] = 0.0;
+                            phi[2][ix][iy][iz] = 0.0;
+                            // conp
+                            conp[0][ix][iy][iz] = cl;
+                            conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
+                            conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
+                        }
+                    }
+                }
+            }
+        }
         istep = istep + 1;
 #pragma omp barrier
         if (istep < nstep)
@@ -691,6 +828,20 @@ void datasave(int step)
         }
     }
     fclose(streamc);
+
+    // Draw y-plane
+    FILE *fp;
+
+    fp = fopen("data/con2d/phi.dat", "w");
+
+    for (int i = 0; i <= ndmx; i++)
+    {
+        for (int l = 0; l <= ndmz; l++)
+        {
+            fprintf(fp, "%e\n", phi[1][i][NDY / 2][l]);
+        }
+    }
+    fclose(fp);
 }
 
 double calC01e(double temp0)
