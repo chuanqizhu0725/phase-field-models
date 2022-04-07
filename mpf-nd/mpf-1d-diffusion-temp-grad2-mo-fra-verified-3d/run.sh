@@ -1,0 +1,1 @@
+g++ -fopenmp main.cpp -o main && rm -f data/con/*.vtk && ./main
