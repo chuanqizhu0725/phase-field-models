@@ -74,6 +74,11 @@ int
     ***phiNum,
     ****phiIdx;
 
+int i, j, k, im, ip, jm, jp, km, kp;
+int ni, phinum0;
+int intpos, dist, hasS, allS, allL, intpass;
+double c0, c00, dc0, sum0, sumplane;
+
 CImg<unsigned char> ch_fld(NDX, NDZ, 1, 3);
 char outFileCh_xz[64];
 char outFiles_xz[64];
@@ -84,11 +89,6 @@ double calDF10(double con0, double temp0, double dS), calDF20(double con0, doubl
 
 int main(void)
 {
-    int i, j, k, im, ip, jm, jp, km, kp;
-    int ni, phinum0;
-    int intpos, dist, hasS, allS, allL;
-    double c0, c00, dc0, sum0, sumplane;
-
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
     cout << "concenration field stablity number is: " << alpha_d << endl;
@@ -300,6 +300,8 @@ int main(void)
         int ix, ixm, ixp, iy, iym, iyp, iz, izm, izp;
         int ii, jj, kk;
         int n1, n2, n3, phinum;
+        int preS, curS;
+        double invV;
 
         double cddtt, sumcs, sumcl, con0izp;
 
@@ -326,7 +328,7 @@ int main(void)
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
             cout << "--" << endl;
-            cout << "   The nominal concnetration is " << c00 << endl;
+            cout << "   The nominal concnetration is " << c0 << endl;
             // ****** YZ *******
             cimg_forXY(ch_fld, x, z)
             {
@@ -642,7 +644,7 @@ int main(void)
             }
             c0 = sum0 / NDX / NDY / NDZ;
             dc0 = c0 - cl;
-            if (dc0 >= 0.003)
+            if (dc0 >= 0.001)
             {
                 for (ix = 0; ix <= ndmx; ix++)
                 {
@@ -694,19 +696,13 @@ int main(void)
                     {
                         iym = ndmy;
                     }
-                    // zeros flux at the bottom
+                    if (iz == ndmz)
+                    {
+                        izp = ndmz;
+                    }
                     if (iz == 0)
                     {
                         izm = 0;
-                    }
-                    // fixed value at the top
-                    if (iz == ndmz)
-                    {
-                        con0izp = cl;
-                    }
-                    else
-                    {
-                        con0izp = conp[0][ix][iy][izp];
                     }
                     //拡散方程式内における微分計算
                     for (ii = 1; ii < nm; ii++)
@@ -714,8 +710,8 @@ int main(void)
                         sumcs = 0.25 * ((phi[ii][ixp][iy][iz] - phi[ii][ixm][iy][iz]) * (conp[ii][ixp][iy][iz] - conp[ii][ixm][iy][iz]) + (phi[ii][ix][iyp][iz] - phi[ii][ix][iym][iz]) * (conp[ii][ix][iyp][iz] - conp[ii][ix][iym][iz]) + (phi[ii][ix][iy][izp] - phi[ii][ix][iy][izm]) * (conp[ii][ix][iy][izp] - conp[ii][ix][iy][izm])) / dx / dx +
                                 phi[ii][ix][iy][iz] * (conp[ii][ixp][iy][iz] + conp[ii][ixm][iy][iz] + conp[ii][ix][iyp][iz] + conp[ii][ix][iym][iz] + conp[ii][ix][iy][izp] + conp[ii][ix][iy][izm] - 6.0 * conp[ii][ix][iy][iz]) / dx / dx;
                     }
-                    sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (con0izp - conp[0][ix][iy][izm])) / dx / dx +
-                            phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + con0izp + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
+                    sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (conp[0][ix][iy][izp] - conp[0][ix][iy][izm])) / dx / dx +
+                            phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + conp[0][ix][iy][izp] + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
                     cddtt = Ds * sumcs + Dl * sumcl;
                     cont2[ix][iy][iz] = cont[ix][iy][iz] + cddtt * dtime;
                     // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
@@ -821,7 +817,18 @@ int main(void)
             // check the distance from the middle of the domain
             if (intpos > mid)
             {
+                curS = istep;
                 dist = intpos - mid;
+                // inverse of the interface velocity
+                invV = (curS - preS) / dist;
+                preS = curS;
+                FILE *streamiv;
+                char bufferiv[30];
+                sprintf(bufferiv, "data/interface/int_vel.csv");
+                streamiv = fopen(bufferiv, "a");
+                fprintf(streamiv, "%e   ", invV);
+                fprintf(streamiv, "\n");
+                fclose(streamiv);
                 cout << "--" << endl;
                 cout << "    the distance away from middle is " << dist << endl;
                 cout << "--" << endl;
@@ -856,6 +863,7 @@ int main(void)
                             // temp
                             temp[ix][iy][iz] = temp[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
                             // cont
+                            // new liquid is flowing into the box
                             cont[ix][iy][iz] = cl;
                             // phi
                             phi[0][ix][iy][iz] = 1.0;
@@ -887,6 +895,7 @@ void datasave(int step)
 {
     int i, j, k;
 
+    // write concentration field
     FILE *streamc;
     char bufferc[30];
     sprintf(bufferc, "data/con/3d%d.vtk", step);
@@ -915,6 +924,24 @@ void datasave(int step)
         }
     }
     fclose(streamc);
+
+    // write interface temperature
+    FILE *streamit; //ストリームのポインタ設定
+    char bufferit[30];
+    sprintf(bufferit, "data/interface/int_temp.csv");
+    streamit = fopen(bufferit, "a");
+    fprintf(streamit, "%e   ", temp[NDX / 2][NDY / 2][mid]);
+    fprintf(streamit, "\n");
+    fclose(streamit); //ファイルをクローズ
+
+    // write nominal concentration
+    FILE *streamnc; //ストリームのポインタ設定
+    char buffernc[30];
+    sprintf(buffernc, "data/con/nom_con.csv");
+    streamnc = fopen(buffernc, "a");
+    fprintf(streamnc, "%e   ", c0);
+    fprintf(streamnc, "\n");
+    fclose(streamnc); //ファイルをクローズ
 }
 
 double calC01e(double temp0)
