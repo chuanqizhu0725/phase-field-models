@@ -301,7 +301,7 @@ int main(void)
         int ii, jj, kk;
         int n1, n2, n3, phinum;
 
-        double cddtt, sumcs, sumcl;
+        double cddtt, sumcs, sumcl, con0izp;
 
         double dF, pddtt, psum, dsum;
         double termiikk, termjjkk;
@@ -640,8 +640,8 @@ int main(void)
                     }
                 }
             }
-            c00 = sum0 / NDX / NDY / NDZ;
-            dc0 = c00 - cl;
+            c0 = sum0 / NDX / NDY / NDZ;
+            dc0 = c0 - cl;
             if (dc0 >= 0.003)
             {
                 for (ix = 0; ix <= ndmx; ix++)
@@ -694,13 +694,19 @@ int main(void)
                     {
                         iym = ndmy;
                     }
-                    if (iz == ndmz)
-                    {
-                        izp = ndmz;
-                    }
+                    // zeros flux at the bottom
                     if (iz == 0)
                     {
                         izm = 0;
+                    }
+                    // fixed value at the top
+                    if (iz == ndmz)
+                    {
+                        con0izp = cl;
+                    }
+                    else
+                    {
+                        con0izp = conp[0][ix][iy][izp];
                     }
                     //拡散方程式内における微分計算
                     for (ii = 1; ii < nm; ii++)
@@ -708,8 +714,8 @@ int main(void)
                         sumcs = 0.25 * ((phi[ii][ixp][iy][iz] - phi[ii][ixm][iy][iz]) * (conp[ii][ixp][iy][iz] - conp[ii][ixm][iy][iz]) + (phi[ii][ix][iyp][iz] - phi[ii][ix][iym][iz]) * (conp[ii][ix][iyp][iz] - conp[ii][ix][iym][iz]) + (phi[ii][ix][iy][izp] - phi[ii][ix][iy][izm]) * (conp[ii][ix][iy][izp] - conp[ii][ix][iy][izm])) / dx / dx +
                                 phi[ii][ix][iy][iz] * (conp[ii][ixp][iy][iz] + conp[ii][ixm][iy][iz] + conp[ii][ix][iyp][iz] + conp[ii][ix][iym][iz] + conp[ii][ix][iy][izp] + conp[ii][ix][iy][izm] - 6.0 * conp[ii][ix][iy][iz]) / dx / dx;
                     }
-                    sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (conp[0][ix][iy][izp] - conp[0][ix][iy][izm])) / dx / dx +
-                            phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + conp[0][ix][iy][izp] + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
+                    sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (con0izp - conp[0][ix][iy][izm])) / dx / dx +
+                            phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + con0izp + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
                     cddtt = Ds * sumcs + Dl * sumcl;
                     cont2[ix][iy][iz] = cont[ix][iy][iz] + cddtt * dtime;
                     // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
