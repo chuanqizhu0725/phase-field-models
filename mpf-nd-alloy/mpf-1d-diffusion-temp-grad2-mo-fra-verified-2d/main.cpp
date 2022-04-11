@@ -24,7 +24,7 @@ int mid = NDX / 2;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 50001;
+int nstep = 100001;
 int pstep = 2000;
 
 double dx = 1.0;
@@ -42,9 +42,26 @@ double S0 = 0.03;
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
+// 1 grid per 1000 steps
+// double temp0 = -0.73;
+// double gradT = 0.002;
+// double rateT = 0.000002;
+
+// 0.75 grid per 1000 steps
+// double temp0 = -0.60;
+// double gradT = 0.002;
+// double rateT = 0.0000015;
+
+// 0.5 grid per 1000 steps
+// double temp0 = -0.50;
+// double gradT = 0.002;
+// double rateT = 0.000001;
+
+// instalibity
 double temp0 = -0.73;
-double gradT = 0.002;    // G = dT/dx
-double rateT = 0.000002; // R = dT/dt, V = R/G ( ~ 1000 step / grid)
+double gradT = 0.002;
+double rateT = 0.000002;
+
 double cl = 0.5;
 
 double alpha_d = dtime * Dl / dx / dx;
@@ -464,7 +481,7 @@ int main(void)
         // --------------------- Correct concentration in liquid phase for mass conservation --------------------------
 #pragma omp barrier
         // collect mass
-        if (th_id == 0)
+        if (th_id == 0 && (istep > nstep / 5))
         {
             sum0 = 0.0;
             for (ix = 0; ix <= ndmx; ix++)
@@ -475,6 +492,25 @@ int main(void)
                 }
             }
             c00 = sum0 / NDX / NDY;
+            dc0 = sum0 / NDX / NDY - cl;
+            if (dc0 >= 0.003)
+            {
+                for (ix = 0; ix <= ndmx; ix++)
+                {
+                    for (iy = 0; iy <= ndmy; iy++)
+                    {
+                        cont[ix][iy] = cont[ix][iy] - dc0;
+                        if (cont[ix][iy] > 1.0)
+                        {
+                            cont[ix][iy] = 1.0;
+                        }
+                        if (cont[ix][iy] < 0.0)
+                        {
+                            cont[ix][iy] = 0.0;
+                        }
+                    }
+                }
+            }
         }
 #pragma omp barrier
         // ---------------------------------  Evolution Equation of Concentration field ------------------------------------

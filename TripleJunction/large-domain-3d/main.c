@@ -8,9 +8,9 @@
 #include <time.h>
 #include <math.h>
 
-#define NDX 200 //差分計算における計算領域一辺の分割数
-#define NDY 200
-#define NDZ 200
+#define NDX 50 //差分計算における計算領域一辺の分割数
+#define NDY 50
+#define NDZ 50
 
 #define N 16 //考慮する結晶方位の数＋１(MPF0.cppと比較して、この値を大きくしている)
 
@@ -86,7 +86,7 @@ double calcTheta(double dy, double dx);
 //******* メインプログラム ******************************************
 int main()
 {
-    nstep = 2;
+    nstep = 1000;
     dtime = 5.0;
     temp = 1000.0;
     L = 2000.0;
@@ -100,7 +100,7 @@ int main()
     A0 = 8.0 * delta * gamma0 / PI / PI; //勾配エネルギー係数[式(4.40)]
     W0 = 4.0 * gamma0 / delta;           //ペナルティー項の係数[式(4.40)]
     M0 = mobi * PI * PI / (8.0 * delta); //粒界の易動度[式(4.40)]
-    F0 = 50.0 / RR / temp;               //粒界移動の駆動力
+    F0 = 100.0 / RR / temp;              //粒界移動の駆動力
 
     for (ii = 0; ii <= nm; ii++)
     {
@@ -133,12 +133,12 @@ int main()
             }
         }
     }
-    // thij[1][0] = PI / 4.0;
-    // thij[0][1] = PI / 4.0;
-    // vpij[1][0] = PI / 4.0;
-    // vpij[0][1] = PI / 4.0;
-    // etaij[1][0] = PI / 4.0;
-    // etaij[0][1] = PI / 4.0;
+    thij[1][0] = PI / 4.0;
+    thij[0][1] = PI / 4.0;
+    vpij[1][0] = PI / 4.0;
+    vpij[0][1] = PI / 4.0;
+    etaij[1][0] = PI / 4.0;
+    etaij[0][1] = PI / 4.0;
 
     double(*phi)[N][NDX][NDY][NDZ] = malloc(sizeof(*phi));
     double(*phi2)[N][NDX][NDY][NDZ] = malloc(sizeof(*phi2));

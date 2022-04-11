@@ -12,9 +12,9 @@ using namespace cimg_library;
 
 #define N 3
 #define NTH 8
-#define NDX 32
-#define NDY 32
-#define NDZ 32
+#define NDX 64
+#define NDY 64
+#define NDZ 64
 #define NDL 2560
 #define PI 3.14159
 
@@ -23,7 +23,7 @@ int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 int ndmz = NDZ - 1;
 int ndml = NDL - 1;
-int mid = NDX / 4;
+int mid = NDX / 2;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
@@ -45,21 +45,23 @@ double S0 = 0.03;
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
-double temp0 = -0.4;
 double gradT = 0.002;
-double rateT = 0.000002;
+// double rateT = 0.000002;
+// double temp0 = -0.60 - NDZ / 4 * gradT;
+double rateT = 0.000006;
+double temp0 = -1.30 - NDZ / 4 * gradT;
 double cl = 0.5;
 
 double alpha_d = dtime * Dl / dx / dx;
 double alpha_m = dtime / dx / dx * mobi * A0;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
-double phi[N][NDX][NDY][NDZ], phi2[N][NDX][NDY][NDZ];
-double cont[NDX][NDY][NDZ], cont2[NDX][NDY][NDZ], conp[N][NDX][NDY][NDZ];
+// double phi[N][NDX][NDY][NDZ], phi2[N][NDX][NDY][NDZ];
+// double cont[NDX][NDY][NDZ], cont2[NDX][NDY][NDZ], conp[N][NDX][NDY][NDZ];
 double conlr[NDL], conlr2[NDL];
-double temp[NDX][NDY][NDZ];
-int phiNum[NDX][NDY][NDZ];
-int phiIdx[N + 1][NDX][NDY][NDZ];
+// double (*temp)[NDX][NDY][NDZ];
+// int phiNum[NDX][NDY][NDZ];
+// int phiIdx[N + 1][NDX][NDY][NDZ];
 
 CImg<unsigned char> ch_fld(NDX, NDZ, 1, 3);
 char outFileCh_xz[64];
@@ -76,6 +78,15 @@ int main(void)
     int ni, phinum0;
     int intpos, dist, hasS, allS, allL;
     double c0, c00, dc0, sum0, sumplane;
+
+    double(*phi)[N][NDX][NDY][NDZ] = malloc(sizeof(*phi));
+    double(*phi2)[N][NDX][NDY][NDZ] = malloc(sizeof(*phi2));
+    int(*phiIdx)[N + 1][NDX][NDY][NDZ] = malloc(sizeof(*phiIdx));
+    int(*phiNum)[NDX][NDY][NDZ] = malloc(sizeof(*phiNum));
+    double(*cont)[NDX][NDY][NDZ] = malloc(sizeof(*cont));
+    double(*cont2)[NDX][NDY][NDZ] = malloc(sizeof(*cont2));
+    double(*conp)[N][NDX][NDY][NDZ] = malloc(sizeof(*conp));
+    double(*temp)[NDX][NDY][NDZ] = malloc(sizeof(*temp));
 
     cout << "----------------------------------------------" << endl;
     cout << "Computation Started!" << endl;
@@ -106,13 +117,16 @@ int main(void)
         }
     }
 
+    mij[1][2] = M0 * 0.1;
+    mij[2][1] = M0 * 0.1;
+
     for (i = 0; i <= ndmx; i++)
     {
         for (j = 0; j <= ndmy; j++)
         {
             for (k = 0; k <= ndmz; k++)
             {
-                temp[i][j][k] = temp0 + gradT * i * dx;
+                (*temp)[i][j][k] = temp0 + gradT * i * dx;
             }
         }
     }
@@ -125,35 +139,36 @@ int main(void)
             for (k = 0; k <= ndmz; k++)
             {
 
-                if ((i < NDX / 2) && (k < NDZ / 4))
+                // if ((i < NDX / 2) && (k < NDZ / 4))
+                if (((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < (NDX * NDX / 2.0 / PI)) && (k < NDZ / 4))
                 {
-                    phi[1][i][j][k] = 1.0;
-                    conp[1][i][j][k] = calC1e(temp[i][j][k]);
-                    phi[2][i][j][k] = 0.0;
-                    conp[2][i][j][k] = calC2e(temp[i][j][k]);
-                    phi[0][i][j][k] = 0.0;
-                    conp[0][i][j][k] = calC01e(temp[i][j][k]);
+                    (*phi)[1][i][j][k] = 1.0;
+                    (*conp)[1][i][j][k] = calC1e((*temp)[i][j][k]);
+                    (*phi)[2][i][j][k] = 0.0;
+                    (*conp)[2][i][j][k] = calC2e((*temp)[i][j][k]);
+                    (*phi)[0][i][j][k] = 0.0;
+                    (*conp)[0][i][j][k] = calC01e((*temp)[i][j][k]);
                 }
-                else if ((i >= NDX / 2) && (k < NDZ / 4))
+                else if (((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) >= (NDX * NDX / 2.0 / PI)) && (k < NDZ / 4))
                 {
-                    phi[1][i][j][k] = 0.0;
-                    conp[1][i][j][k] = calC1e(temp[i][j][k]);
-                    phi[2][i][j][k] = 1.0;
-                    conp[2][i][j][k] = calC2e(temp[i][j][k]);
-                    phi[0][i][j][k] = 0.0;
-                    conp[0][i][j][k] = calC02e(temp[i][j][k]);
+                    (*phi)[1][i][j][k] = 0.0;
+                    (*conp)[1][i][j][k] = calC1e((*temp)[i][j][k]);
+                    (*phi)[2][i][j][k] = 1.0;
+                    (*conp)[2][i][j][k] = calC2e((*temp)[i][j][k]);
+                    (*phi)[0][i][j][k] = 0.0;
+                    (*conp)[0][i][j][k] = calC02e((*temp)[i][j][k]);
                 }
                 else
                 {
-                    phi[1][i][j][k] = 0.0;
-                    conp[1][i][j][k] = calC1e(temp[i][j][k]);
-                    phi[2][i][j][k] = 0.0;
-                    conp[2][i][j][k] = calC2e(temp[i][j][k]);
-                    phi[0][i][j][k] = 1.0;
-                    conp[0][i][j][k] = cl;
+                    (*phi)[1][i][j][k] = 0.0;
+                    (*conp)[1][i][j][k] = calC1e((*temp)[i][j][k]);
+                    (*phi)[2][i][j][k] = 0.0;
+                    (*conp)[2][i][j][k] = calC2e((*temp)[i][j][k]);
+                    (*phi)[0][i][j][k] = 1.0;
+                    (*conp)[0][i][j][k] = cl;
                 }
-                cont[i][j][k] = conp[1][i][j][k] * phi[1][i][j][k] + conp[2][i][j][k] * phi[2][i][j][k] + conp[0][i][j][k] * phi[0][i][j][k];
-                sum0 += cont[i][j][k];
+                (*cont)[i][j][k] = (*conp)[1][i][j][k] * (*phi)[1][i][j][k] + (*conp)[2][i][j][k] * (*phi)[2][i][j][k] + (*conp)[0][i][j][k] * (*phi)[0][i][j][k];
+                sum0 += (*cont)[i][j][k];
             }
         }
     }
@@ -172,11 +187,11 @@ int main(void)
                 km = k - 1;
                 if (i == ndmx)
                 {
-                    ip = ndmx;
+                    ip = 0;
                 }
                 if (i == 0)
                 {
-                    im = 0;
+                    im = ndmx;
                 }
                 if (j == ndmy)
                 {
@@ -198,19 +213,19 @@ int main(void)
                 phinum0 = 0;
                 for (ni = 0; ni <= nm; ni++)
                 {
-                    if ((phi[ni][i][j][k] > 0.0) ||
-                        ((phi[ni][i][j][k] == 0.0) && (phi[ni][ip][j][k] > 0.0) ||
-                         (phi[ni][im][j][k] > 0.0) ||
-                         (phi[ni][i][jp][k] > 0.0) ||
-                         (phi[ni][i][jm][k] > 0.0) ||
-                         (phi[ni][i][j][kp] > 0.0) ||
-                         (phi[ni][i][j][km] > 0.0)))
+                    if (((*phi)[ni][i][j][k] > 0.0) ||
+                        (((*phi)[ni][i][j][k] == 0.0) && ((*phi)[ni][ip][j][k] > 0.0) ||
+                         ((*phi)[ni][im][j][k] > 0.0) ||
+                         ((*phi)[ni][i][jp][k] > 0.0) ||
+                         ((*phi)[ni][i][jm][k] > 0.0) ||
+                         ((*phi)[ni][i][j][kp] > 0.0) ||
+                         ((*phi)[ni][i][j][km] > 0.0)))
                     {
                         phinum0++;
-                        phiIdx[phinum0][i][j][k] = ni;
+                        (*phiIdx)[phinum0][i][j][k] = ni;
                     }
                 }
-                phiNum[i][j][k] = phinum0;
+                (*phiNum)[i][j][k] = phinum0;
             }
         }
     }
@@ -247,13 +262,14 @@ int main(void)
         {
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
-            cout << "The nominal concnetration is " << c00 << endl;
+            cout << "--" << endl;
+            cout << "   The nominal concnetration is " << c00 << endl;
             // ****** YZ *******
             cimg_forXY(ch_fld, x, z)
             {
-                ch_fld(x, z, 0) = 255. * (cont[x][NDY / 2][z]) / 0.7; // red
-                ch_fld(x, z, 1) = 255. * (cont[x][NDY / 2][z]) / 0.7; // green
-                ch_fld(x, z, 2) = 255. * (cont[x][NDY / 2][z]) / 0.7; // blue
+                ch_fld(x, z, 0) = 255. * ((*cont)[x][NDY / 2][z]); // red
+                ch_fld(x, z, 1) = 255. * ((*cont)[x][NDY / 2][z]); // green
+                ch_fld(x, z, 2) = 255. * ((*cont)[x][NDY / 2][z]); // blue
             }
             sprintf(outFileCh_xz, "figures/con/2d%d.png", istep); // generate imagefile
             ch_fld.save_jpeg(outFileCh_xz);                       // save imagegilee
@@ -274,11 +290,11 @@ int main(void)
                     izm = iz - 1;
                     if (ix == ndmx)
                     {
-                        ixp = ndmx;
+                        ixp = 0;
                     }
                     if (ix == 0)
                     {
-                        ixm = 0;
+                        ixm = ndmx;
                     }
                     if (iy == ndmy)
                     {
@@ -297,54 +313,54 @@ int main(void)
                         izm = 0;
                     }
 
-                    for (n1 = 1; n1 <= phiNum[ix][iy][iz]; n1++)
+                    for (n1 = 1; n1 <= (*phiNum)[ix][iy][iz]; n1++)
                     {
-                        ii = phiIdx[n1][ix][iy][iz];
+                        ii = (*phiIdx)[n1][ix][iy][iz];
                         pddtt = 0.0;
-                        for (n2 = 1; n2 <= phiNum[ix][iy][iz]; n2++)
+                        for (n2 = 1; n2 <= (*phiNum)[ix][iy][iz]; n2++)
                         {
-                            jj = phiIdx[n2][ix][iy][iz];
+                            jj = (*phiIdx)[n2][ix][iy][iz];
                             dsum = 0.0;
-                            for (n3 = 1; n3 <= phiNum[ix][iy][iz]; n3++)
+                            for (n3 = 1; n3 <= (*phiNum)[ix][iy][iz]; n3++)
                             {
-                                kk = phiIdx[n3][ix][iy][iz];
+                                kk = (*phiIdx)[n3][ix][iy][iz];
 
-                                termiikk = aij[ii][kk] * (phi[kk][ixp][iy][iz] + phi[kk][ixm][iy][iz] + phi[kk][ix][iyp][iz] + phi[kk][ix][iym][iz] + phi[kk][ix][iy][izp] + phi[kk][ix][iy][izm] - 6.0 * phi[kk][ix][iy][iz]) / (dx * dx);
+                                termiikk = aij[ii][kk] * ((*phi)[kk][ixp][iy][iz] + (*phi)[kk][ixm][iy][iz] + (*phi)[kk][ix][iyp][iz] + (*phi)[kk][ix][iym][iz] + (*phi)[kk][ix][iy][izp] + (*phi)[kk][ix][iy][izm] - 6.0 * (*phi)[kk][ix][iy][iz]) / (dx * dx);
 
-                                termjjkk = aij[jj][kk] * (phi[kk][ixp][iy][iz] + phi[kk][ixm][iy][iz] + phi[kk][ix][iyp][iz] + phi[kk][ix][iym][iz] + phi[kk][ix][iy][izp] + phi[kk][ix][iy][izm] - 6.0 * phi[kk][ix][iy][iz]) / (dx * dx);
+                                termjjkk = aij[jj][kk] * ((*phi)[kk][ixp][iy][iz] + (*phi)[kk][ixm][iy][iz] + (*phi)[kk][ix][iyp][iz] + (*phi)[kk][ix][iym][iz] + (*phi)[kk][ix][iy][izp] + (*phi)[kk][ix][iy][izm] - 6.0 * (*phi)[kk][ix][iy][iz]) / (dx * dx);
 
-                                dsum += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][ix][iy][iz];
+                                dsum += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * (*phi)[kk][ix][iy][iz];
                             }
                             if (ii == 1 && jj == 0)
                             {
-                                dF = calDF10(conp[0][ix][iy][iz], temp[ix][iy][iz], S0);
+                                dF = calDF10((*conp)[0][ix][iy][iz], (*temp)[ix][iy][iz], S0);
                             }
                             else if (ii == 0 && jj == 1)
                             {
-                                dF = -calDF10(conp[0][ix][iy][iz], temp[ix][iy][iz], S0);
+                                dF = -calDF10((*conp)[0][ix][iy][iz], (*temp)[ix][iy][iz], S0);
                             }
                             else if (ii == 2 && jj == 0)
                             {
-                                dF = calDF20(conp[0][ix][iy][iz], temp[ix][iy][iz], S0);
+                                dF = calDF20((*conp)[0][ix][iy][iz], (*temp)[ix][iy][iz], S0);
                             }
                             else if (ii == 0 && jj == 2)
                             {
-                                dF = -calDF20(conp[0][ix][iy][iz], temp[ix][iy][iz], S0);
+                                dF = -calDF20((*conp)[0][ix][iy][iz], (*temp)[ix][iy][iz], S0);
                             }
                             else
                             {
                                 dF = 0.0;
                             }
-                            pddtt += -2.0 * mij[ii][jj] / double(phiNum[ix][iy][iz]) * (dsum - 8.0 / PI * dF * sqrt(phi[ii][ix][iy][iz] * phi[jj][ix][iy][iz]));
+                            pddtt += -2.0 * mij[ii][jj] / double((*phiNum)[ix][iy][iz]) * (dsum - 8.0 / PI * dF * sqrt((*phi)[ii][ix][iy][iz] * (*phi)[jj][ix][iy][iz]));
                         }
-                        phi2[ii][ix][iy][iz] = phi[ii][ix][iy][iz] + pddtt * dtime;
-                        if (phi2[ii][ix][iy][iz] >= 1.0)
+                        (*phi2)[ii][ix][iy][iz] = (*phi)[ii][ix][iy][iz] + pddtt * dtime;
+                        if ((*phi2)[ii][ix][iy][iz] >= 1.0)
                         {
-                            phi2[ii][ix][iy][iz] = 1.0;
+                            (*phi2)[ii][ix][iy][iz] = 1.0;
                         }
-                        if (phi2[ii][ix][iy][iz] <= 0.0)
+                        if ((*phi2)[ii][ix][iy][iz] <= 0.0)
                         {
-                            phi2[ii][ix][iy][iz] = 0.0;
+                            (*phi2)[ii][ix][iy][iz] = 0.0;
                         }
                     }
                 } // ix
@@ -359,7 +375,7 @@ int main(void)
                 {
                     for (kk = 0; kk <= nm; kk++)
                     {
-                        phi[kk][ix][iy][iz] = phi2[kk][ix][iy][iz];
+                        (*phi)[kk][ix][iy][iz] = (*phi2)[kk][ix][iy][iz];
                     }
                 }
             }
@@ -375,12 +391,12 @@ int main(void)
                     psum = 0.0;
                     for (kk = 0; kk <= nm; kk++)
                     {
-                        psum += phi[kk][ix][iy][iz];
+                        psum += (*phi)[kk][ix][iy][iz];
                     }
                     for (kk = 0; kk <= nm; kk++)
                     {
-                        phi[kk][ix][iy][iz] = phi[kk][ix][iy][iz] / psum;
-                        phi2[kk][ix][iy][iz] = phi[kk][ix][iy][iz];
+                        (*phi)[kk][ix][iy][iz] = (*phi)[kk][ix][iy][iz] / psum;
+                        (*phi2)[kk][ix][iy][iz] = (*phi)[kk][ix][iy][iz];
                     }
                 }
             }
@@ -401,11 +417,11 @@ int main(void)
                     izm = iz - 1;
                     if (ix == ndmx)
                     {
-                        ixp = ndmx;
+                        ixp = 0;
                     }
                     if (ix == 0)
                     {
-                        ixm = 0;
+                        ixm = ndmx;
                     }
                     if (iy == ndmy)
                     {
@@ -427,20 +443,20 @@ int main(void)
                     phinum = 0;
                     for (ii = 0; ii <= nm; ii++)
                     {
-                        if ((phi[ii][ix][iy][iz] > 0.0) ||
-                            ((phi[ii][ix][iy][iz] == 0.0) &&
-                                 (phi[ii][ixp][iy][iz] > 0.0) ||
-                             (phi[ii][ixm][iy][iz] > 0.0) ||
-                             (phi[ii][ix][iyp][iz] > 0.0) ||
-                             (phi[ii][ix][iym][iz] > 0.0) ||
-                             (phi[ii][ix][iy][izp] > 0.0) ||
-                             (phi[ii][ix][iy][izm] > 0.0)))
+                        if (((*phi)[ii][ix][iy][iz] > 0.0) ||
+                            (((*phi)[ii][ix][iy][iz] == 0.0) &&
+                                 ((*phi)[ii][ixp][iy][iz] > 0.0) ||
+                             ((*phi)[ii][ixm][iy][iz] > 0.0) ||
+                             ((*phi)[ii][ix][iyp][iz] > 0.0) ||
+                             ((*phi)[ii][ix][iym][iz] > 0.0) ||
+                             ((*phi)[ii][ix][iy][izp] > 0.0) ||
+                             ((*phi)[ii][ix][iy][izm] > 0.0)))
                         {
                             phinum++;
-                            phiIdx[phinum][ix][iy][iz] = ii;
+                            (*phiIdx)[phinum][ix][iy][iz] = ii;
                         }
                     }
-                    phiNum[ix][iy][iz] = phinum;
+                    (*phiNum)[ix][iy][iz] = phinum;
                 }
             }
         }
@@ -482,65 +498,65 @@ int main(void)
                     {
                         izm = 0;
                     }
-                    if (phi[0][ix][iy][iz] == 0.0)
+                    if ((*phi)[0][ix][iy][iz] == 0.0)
                     {
-                        if (phi[1][ix][iy][iz] == 1.0)
+                        if ((*phi)[1][ix][iy][iz] == 1.0)
                         {
-                            conp[1][ix][iy][iz] = cont[ix][iy][iz];
+                            (*conp)[1][ix][iy][iz] = (*cont)[ix][iy][iz];
                         }
                         else
                         {
-                            conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
+                            (*conp)[1][ix][iy][iz] = calC1e((*temp)[ix][iy][iz]);
                         }
-                        if (phi[2][ix][iy][iz] == 1.0)
+                        if ((*phi)[2][ix][iy][iz] == 1.0)
                         {
-                            conp[2][ix][iy][iz] = cont[ix][iy][iz];
+                            (*conp)[2][ix][iy][iz] = (*cont)[ix][iy][iz];
                         }
                         else
                         {
-                            conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
+                            (*conp)[2][ix][iy][iz] = calC2e((*temp)[ix][iy][iz]);
                         }
                         // Correct abnormal calculation at solid edge
-                        if ((phi[0][ixp][iy][iz] > 0.0) || (phi[0][ixm][iy][iz] > 0.0) || (phi[0][ix][iyp][iz] > 0.0) || (phi[0][ix][iym][iz] > 0.0) || (phi[0][ix][iy][izp] > 0.0) || (phi[0][ix][iy][izm] > 0.0))
+                        if (((*phi)[0][ixp][iy][iz] > 0.0) || ((*phi)[0][ixm][iy][iz] > 0.0) || ((*phi)[0][ix][iyp][iz] > 0.0) || ((*phi)[0][ix][iym][iz] > 0.0) || ((*phi)[0][ix][iy][izp] > 0.0) || ((*phi)[0][ix][iy][izm] > 0.0))
                         {
-                            conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
-                            conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
+                            (*conp)[1][ix][iy][iz] = calC1e((*temp)[ix][iy][iz]);
+                            (*conp)[2][ix][iy][iz] = calC2e((*temp)[ix][iy][iz]);
                         }
-                        conp[0][ix][iy][iz] = calC01e(temp[ix][iy][iz]) * phi[1][ix][iy][iz] + calC02e(temp[ix][iy][iz]) * phi[2][ix][iy][iz];
+                        (*conp)[0][ix][iy][iz] = calC01e((*temp)[ix][iy][iz]) * (*phi)[1][ix][iy][iz] + calC02e((*temp)[ix][iy][iz]) * (*phi)[2][ix][iy][iz];
                     }
-                    else if (phi[0][ix][iy][iz] > 0.0 && phi[0][ix][iy][iz] < 1.0)
+                    else if ((*phi)[0][ix][iy][iz] > 0.0 && (*phi)[0][ix][iy][iz] < 1.0)
                     {
-                        conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
-                        conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
-                        conp[0][ix][iy][iz] = (cont[ix][iy][iz] - conp[1][ix][iy][iz] * phi[1][ix][iy][iz] - conp[2][ix][iy][iz] * phi[2][ix][iy][iz]) / phi[0][ix][iy][iz];
+                        (*conp)[1][ix][iy][iz] = calC1e((*temp)[ix][iy][iz]);
+                        (*conp)[2][ix][iy][iz] = calC2e((*temp)[ix][iy][iz]);
+                        (*conp)[0][ix][iy][iz] = ((*cont)[ix][iy][iz] - (*conp)[1][ix][iy][iz] * (*phi)[1][ix][iy][iz] - (*conp)[2][ix][iy][iz] * (*phi)[2][ix][iy][iz]) / (*phi)[0][ix][iy][iz];
                         // Correct abnormal calculation at liquid edge
-                        if (phi[0][ix][iy][iz] < 0.05)
+                        if ((*phi)[0][ix][iy][iz] < 0.05)
                         {
-                            conp[0][ix][iy][iz] = (calC01e(temp[ix][iy][iz]) * phi[1][ix][iy][iz] + calC02e(temp[ix][iy][iz]) * phi[2][ix][iy][iz]) / (phi[1][ix][iy][iz] + phi[2][ix][iy][iz]);
+                            (*conp)[0][ix][iy][iz] = (calC01e((*temp)[ix][iy][iz]) * (*phi)[1][ix][iy][iz] + calC02e((*temp)[ix][iy][iz]) * (*phi)[2][ix][iy][iz]) / ((*phi)[1][ix][iy][iz] + (*phi)[2][ix][iy][iz]);
                         }
-                        if (conp[0][ix][iy][iz] > 1.0)
+                        if ((*conp)[0][ix][iy][iz] > 1.0)
                         {
-                            conp[0][ix][iy][iz] = 1.0;
+                            (*conp)[0][ix][iy][iz] = 1.0;
                         }
-                        if (conp[0][ix][iy][iz] < 0.0)
+                        if ((*conp)[0][ix][iy][iz] < 0.0)
                         {
-                            conp[0][ix][iy][iz] = 0.0;
+                            (*conp)[0][ix][iy][iz] = 0.0;
                         }
                     }
-                    else if (phi[0][ix][iy][iz] == 1.0)
+                    else if ((*phi)[0][ix][iy][iz] == 1.0)
                     {
-                        conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
-                        conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
-                        conp[0][ix][iy][iz] = cont[ix][iy][iz];
+                        (*conp)[1][ix][iy][iz] = calC1e((*temp)[ix][iy][iz]);
+                        (*conp)[2][ix][iy][iz] = calC2e((*temp)[ix][iy][iz]);
+                        (*conp)[0][ix][iy][iz] = (*cont)[ix][iy][iz];
                     }
-                    cont[ix][iy][iz] = conp[1][ix][iy][iz] * phi[1][ix][iy][iz] + conp[2][ix][iy][iz] * phi[2][ix][iy][iz] + conp[0][ix][iy][iz] * phi[0][ix][iy][iz];
-                    if (cont[ix][iy][iz] > 1.0)
+                    (*cont)[ix][iy][iz] = (*conp)[1][ix][iy][iz] * (*phi)[1][ix][iy][iz] + (*conp)[2][ix][iy][iz] * (*phi)[2][ix][iy][iz] + (*conp)[0][ix][iy][iz] * (*phi)[0][ix][iy][iz];
+                    if ((*cont)[ix][iy][iz] > 1.0)
                     {
-                        cont[ix][iy][iz] = 1.0;
+                        (*cont)[ix][iy][iz] = 1.0;
                     }
-                    if (cont[ix][iy][iz] < 0.0)
+                    if ((*cont)[ix][iy][iz] < 0.0)
                     {
-                        cont[ix][iy][iz] = 0.0;
+                        (*cont)[ix][iy][iz] = 0.0;
                     }
                 }
             }
@@ -557,7 +573,7 @@ int main(void)
                 {
                     for (iz = 0; iz <= ndmz; iz++)
                     {
-                        sum0 += cont[ix][iy][iz];
+                        sum0 += (*cont)[ix][iy][iz];
                     }
                 }
             }
@@ -571,14 +587,14 @@ int main(void)
                     {
                         for (iz = 0; iz <= ndmz; iz++)
                         {
-                            cont[ix][iy][iz] = cont[ix][iy][iz] - dc0;
-                            if (cont[ix][iy][iz] > 1.0)
+                            (*cont)[ix][iy][iz] = (*cont)[ix][iy][iz] - dc0;
+                            if ((*cont)[ix][iy][iz] > 1.0)
                             {
-                                cont[ix][iy][iz] = 1.0;
+                                (*cont)[ix][iy][iz] = 1.0;
                             }
-                            if (cont[ix][iy][iz] < 0.0)
+                            if ((*cont)[ix][iy][iz] < 0.0)
                             {
-                                cont[ix][iy][iz] = 0.0;
+                                (*cont)[ix][iy][iz] = 0.0;
                             }
                         }
                     }
@@ -626,13 +642,13 @@ int main(void)
                     //拡散方程式内における微分計算
                     for (ii = 1; ii < nm; ii++)
                     {
-                        sumcs = 0.25 * ((phi[ii][ixp][iy][iz] - phi[ii][ixm][iy][iz]) * (conp[ii][ixp][iy][iz] - conp[ii][ixm][iy][iz]) + (phi[ii][ix][iyp][iz] - phi[ii][ix][iym][iz]) * (conp[ii][ix][iyp][iz] - conp[ii][ix][iym][iz]) + (phi[ii][ix][iy][izp] - phi[ii][ix][iy][izm]) * (conp[ii][ix][iy][izp] - conp[ii][ix][iy][izm])) / dx / dx +
-                                phi[ii][ix][iy][iz] * (conp[ii][ixp][iy][iz] + conp[ii][ixm][iy][iz] + conp[ii][ix][iyp][iz] + conp[ii][ix][iym][iz] + conp[ii][ix][iy][izp] + conp[ii][ix][iy][izm] - 6.0 * conp[ii][ix][iy][iz]) / dx / dx;
+                        sumcs = 0.25 * (((*phi)[ii][ixp][iy][iz] - (*phi)[ii][ixm][iy][iz]) * ((*conp)[ii][ixp][iy][iz] - (*conp)[ii][ixm][iy][iz]) + ((*phi)[ii][ix][iyp][iz] - (*phi)[ii][ix][iym][iz]) * ((*conp)[ii][ix][iyp][iz] - (*conp)[ii][ix][iym][iz]) + ((*phi)[ii][ix][iy][izp] - (*phi)[ii][ix][iy][izm]) * ((*conp)[ii][ix][iy][izp] - (*conp)[ii][ix][iy][izm])) / dx / dx +
+                                (*phi)[ii][ix][iy][iz] * ((*conp)[ii][ixp][iy][iz] + (*conp)[ii][ixm][iy][iz] + (*conp)[ii][ix][iyp][iz] + (*conp)[ii][ix][iym][iz] + (*conp)[ii][ix][iy][izp] + (*conp)[ii][ix][iy][izm] - 6.0 * (*conp)[ii][ix][iy][iz]) / dx / dx;
                     }
-                    sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (conp[0][ix][iy][izp] - conp[0][ix][iy][izm])) / dx / dx +
-                            phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + conp[0][ix][iy][izp] + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
+                    sumcl = 0.25 * (((*phi)[0][ixp][iy][iz] - (*phi)[0][ixm][iy][iz]) * ((*conp)[0][ixp][iy][iz] - (*conp)[0][ixm][iy][iz]) + ((*phi)[0][ix][iyp][iz] - (*phi)[0][ix][iym][iz]) * ((*conp)[0][ix][iyp][iz] - (*conp)[0][ix][iym][iz]) + ((*phi)[0][ix][iy][izp] - (*phi)[0][ix][iy][izm]) * ((*conp)[0][ix][iy][izp] - (*conp)[0][ix][iy][izm])) / dx / dx +
+                            (*phi)[0][ix][iy][iz] * ((*conp)[0][ixp][iy][iz] + (*conp)[0][ixm][iy][iz] + (*conp)[0][ix][iyp][iz] + (*conp)[0][ix][iym][iz] + (*conp)[0][ix][iy][izp] + (*conp)[0][ix][iy][izm] - 6.0 * (*conp)[0][ix][iy][iz]) / dx / dx;
                     cddtt = Ds * sumcs + Dl * sumcl;
-                    cont2[ix][iy][iz] = cont[ix][iy][iz] + cddtt * dtime;
+                    (*cont2)[ix][iy][iz] = (*cont)[ix][iy][iz] + cddtt * dtime;
                     // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
                 }
             }
@@ -644,7 +660,7 @@ int main(void)
             {
                 for (iz = 0; iz <= ndmz; iz++)
                 {
-                    cont[ix][iy][iz] = cont2[ix][iy][iz];
+                    (*cont)[ix][iy][iz] = (*cont2)[ix][iy][iz];
                 }
             }
         }
@@ -656,7 +672,7 @@ int main(void)
             {
                 for (iz = 0; iz <= ndmz; iz++)
                 {
-                    temp[ix][iy][iz] -= rateT * dtime;
+                    (*temp)[ix][iy][iz] -= rateT * dtime;
                 }
             }
         }
@@ -671,11 +687,11 @@ int main(void)
             {
                 for (iy = 0; iy <= ndmy; iy++)
                 {
-                    if (phi[0][ix][iy][0] != 0.0)
+                    if ((*phi)[0][ix][iy][0] != 0.0)
                     {
                         hasS = 0;
                     }
-                    sumplane += phi[0][ix][iy][0];
+                    sumplane += (*phi)[0][ix][iy][0];
                     if ((sumplane == 0.0) && (iy == ndmy) && (ix == ndmx))
                     {
                         hasS = 1;
@@ -698,7 +714,7 @@ int main(void)
                     {
                         for (iy = 0; iy <= ndmy; iy++)
                         {
-                            if (phi[0][ix][iy][iz] > 0.0)
+                            if ((*phi)[0][ix][iy][iz] > 0.0)
                             {
                                 allS = 0;
                                 break;
@@ -719,7 +735,7 @@ int main(void)
                     {
                         for (iy = 0; iy <= ndmy; iy++)
                         {
-                            sumplane += phi[0][ix][iy][iz];
+                            sumplane += (*phi)[0][ix][iy][iz];
                         }
                     }
                     if (sumplane == double(NDX * NDY))
@@ -737,8 +753,10 @@ int main(void)
             if (intpos > mid)
             {
                 dist = intpos - mid;
-                cout << "the thread which is moving frame is " << th_id << endl;
-                cout << "the distance away from middle is " << dist << endl;
+                cout << "--" << endl;
+                cout << "    the distance away from middle is " << dist << endl;
+                cout << "--" << endl;
+                cout << "    the interface temperature is " << (*temp)[NDX / 2][NDY / 2][mid] << endl;
                 for (iz = 0; iz <= (ndmz - dist); iz++)
                 {
                     for (ix = 0; ix <= ndmx; ix++)
@@ -746,17 +764,17 @@ int main(void)
                         for (iy = 0; iy <= ndmy; iy++)
                         {
                             // temp
-                            temp[ix][iy][iz] = temp[ix][iy][iz + dist];
+                            (*temp)[ix][iy][iz] = (*temp)[ix][iy][iz + dist];
                             // cont
-                            cont[ix][iy][iz] = cont[ix][iy][iz + dist];
+                            (*cont)[ix][iy][iz] = (*cont)[ix][iy][iz + dist];
                             // phi
-                            phi[0][ix][iy][iz] = phi[0][ix][iy][iz + dist];
-                            phi[1][ix][iy][iz] = phi[1][ix][iy][iz + dist];
-                            phi[2][ix][iy][iz] = phi[2][ix][iy][iz + dist];
+                            (*phi)[0][ix][iy][iz] = (*phi)[0][ix][iy][iz + dist];
+                            (*phi)[1][ix][iy][iz] = (*phi)[1][ix][iy][iz + dist];
+                            (*phi)[2][ix][iy][iz] = (*phi)[2][ix][iy][iz + dist];
                             // conp
-                            conp[0][ix][iy][iz] = conp[0][ix][iy][iz + dist];
-                            conp[1][ix][iy][iz] = conp[1][ix][iy][iz + dist];
-                            conp[2][ix][iy][iz] = conp[2][ix][iy][iz + dist];
+                            (*conp)[0][ix][iy][iz] = (*conp)[0][ix][iy][iz + dist];
+                            (*conp)[1][ix][iy][iz] = (*conp)[1][ix][iy][iz + dist];
+                            (*conp)[2][ix][iy][iz] = (*conp)[2][ix][iy][iz + dist];
                         }
                     }
                 }
@@ -767,17 +785,17 @@ int main(void)
                         for (iy = 0; iy <= ndmy; iy++)
                         {
                             // temp
-                            temp[ix][iy][iz] = temp[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
+                            (*temp)[ix][iy][iz] = (*temp)[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
                             // cont
-                            cont[ix][iy][iz] = cl;
+                            (*cont)[ix][iy][iz] = cl;
                             // phi
-                            phi[0][ix][iy][iz] = 1.0;
-                            phi[1][ix][iy][iz] = 0.0;
-                            phi[2][ix][iy][iz] = 0.0;
+                            (*phi)[0][ix][iy][iz] = 1.0;
+                            (*phi)[1][ix][iy][iz] = 0.0;
+                            (*phi)[2][ix][iy][iz] = 0.0;
                             // conp
-                            conp[0][ix][iy][iz] = cl;
-                            conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
-                            conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
+                            (*conp)[0][ix][iy][iz] = cl;
+                            (*conp)[1][ix][iy][iz] = calC1e((*temp)[ix][iy][iz]);
+                            (*conp)[2][ix][iy][iz] = calC2e((*temp)[ix][iy][iz]);
                         }
                     }
                 }
@@ -823,25 +841,11 @@ void datasave(int step)
         {
             for (i = 0; i <= ndmx; i++)
             {
-                fprintf(streamc, "%e\n", cont[i][j][k]);
+                fprintf(streamc, "%e\n", (*cont)[i][j][k]);
             }
         }
     }
     fclose(streamc);
-
-    // Draw y-plane
-    FILE *fp;
-
-    fp = fopen("data/con2d/phi.dat", "w");
-
-    for (int i = 0; i <= ndmx; i++)
-    {
-        for (int l = 0; l <= ndmz; l++)
-        {
-            fprintf(fp, "%e\n", phi[1][i][NDY / 2][l]);
-        }
-    }
-    fclose(fp);
 }
 
 double calC01e(double temp0)

@@ -21,12 +21,11 @@ int ndml = NDL - 1;
 int rows = ND / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 200001;
+int nstep = 100001;
 int pstep = 2000;
 
 double dx = 1.0;
-double dxL = 5.0;
-double dtime = 0.02;
+double dtime = 0.025;
 double gamma0 = 0.5;
 double mobi = 1.0;
 double delta = 5.0 * dx;
@@ -34,15 +33,15 @@ double delta = 5.0 * dx;
 double A0 = 8.0 * delta * gamma0 / PI / PI;
 double W0 = 4.0 * gamma0 / delta;
 double M0 = mobi * PI * PI / (8.0 * delta);
-double S0 = 0.5;
+double S0 = 3.0;
 
-double Dl = 5.0;
-double Ds = 0.01;
+double Dl = 4.0;
+double Ds = 1.0e-4;
 
 double temp0 = 1.0;
 double gradT = 0.01;
-double dts = 0.50 / nstep;
-double cl = 0.2;
+double dts = 0.000002;
+double cl = 0.30;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
 double phi[N][ND], phi2[N][ND];
@@ -598,7 +597,7 @@ void datasave(int step)
         fprintf(streamt, "%e   ", temp[i] / 10.0);
         fprintf(streamt, "\n");
     }
-    fclose(streamcs); //ファイルをクローズ
+    fclose(streamt); //ファイルをクローズ
 }
 
 double calC01e(double temp0)

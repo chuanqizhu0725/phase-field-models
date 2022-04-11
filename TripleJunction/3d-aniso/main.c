@@ -3,15 +3,10 @@
 // Created on: 2022/2/16
 // Updated on 2022/03/07
 
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <typeinfo>
 
 #define NDX 30 //差分計算における計算領域一辺の分割数
 #define NDY 30 //差分計算における計算領域一辺の分割数

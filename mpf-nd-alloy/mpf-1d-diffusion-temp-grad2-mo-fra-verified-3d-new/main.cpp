@@ -27,14 +27,13 @@ int mid = NDX / 2;
 int rows = NDX / NTH;
 int rowsl = NDL / NTH;
 
-int nstep = 1001;
-int pstep = 500;
+int nstep = 50001;
+int pstep = 2000;
 
 double dx = 1.0;
 double dtime = 1.0;
 
 double gamma0 = 0.1;
-double astre = -0.05;
 double mobi = 0.25;
 double delta = 5.0 * dx;
 
@@ -46,17 +45,17 @@ double S0 = 0.03;
 double Dl = 0.1;
 double Ds = 2.0e-4;
 
-double gradT = 0.000;
-double rateT = 0.000000;
-double temp0 = 1.0;
-double cl = 0.2;
+double gradT = 0.002;
+// double rateT = 0.000002;
+// double temp0 = -0.60 - NDZ / 4 * gradT;
+double rateT = 0.000006;
+double temp0 = -1.30 - NDZ / 4 * gradT;
+double cl = 0.5;
 
 double alpha_d = dtime * Dl / dx / dx;
 double alpha_m = dtime / dx / dx * mobi * A0;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
-double thij[N][N], vpij[N][N], etaij[N][N];
-int anij[N][N];
 double conlr[NDL], conlr2[NDL];
 
 double
@@ -168,17 +167,11 @@ int main(void)
             wij[i][j] = W0;
             aij[i][j] = A0;
             mij[i][j] = M0;
-            anij[i][j] = 0;
-            if ((i == 0) || (j == 0))
-            {
-                anij[i][j] = 1;
-            }
             if (i == j)
             {
                 wij[i][j] = 0.0;
                 aij[i][j] = 0.0;
                 mij[i][j] = 0.0;
-                anij[i][j] = 0;
             }
         }
     }
@@ -204,7 +197,7 @@ int main(void)
         {
             for (k = 0; k <= ndmz; k++)
             {
-                if ((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) + (k - NDZ / 2) * (k - NDZ / 2) < 100)
+                if (((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) < (NDX * NDX / 2.0 / PI)) && (k < NDZ / 4))
                 {
                     phi[1][i][j][k] = 1.0;
                     conp[1][i][j][k] = calC1e(temp[i][j][k]);
@@ -212,6 +205,15 @@ int main(void)
                     conp[2][i][j][k] = calC2e(temp[i][j][k]);
                     phi[0][i][j][k] = 0.0;
                     conp[0][i][j][k] = calC01e(temp[i][j][k]);
+                }
+                else if (((i - NDX / 2) * (i - NDX / 2) + (j - NDY / 2) * (j - NDY / 2) >= (NDX * NDX / 2.0 / PI)) && (k < NDZ / 4))
+                {
+                    phi[1][i][j][k] = 0.0;
+                    conp[1][i][j][k] = calC1e(temp[i][j][k]);
+                    phi[2][i][j][k] = 1.0;
+                    conp[2][i][j][k] = calC2e(temp[i][j][k]);
+                    phi[0][i][j][k] = 0.0;
+                    conp[0][i][j][k] = calC02e(temp[i][j][k]);
                 }
                 else
                 {
@@ -286,22 +288,22 @@ int main(void)
     }
 
     // create a vtk file for writing passed domain)
-    // FILE *streamc;
-    // char bufferc[30];
-    // sprintf(bufferc, "data/con/passed.vtk");
-    // streamc = fopen(bufferc, "a");
-    // fprintf(streamc, "# vtk DataFile Version 1.0\n");
-    // fprintf(streamc, "passed.vtk\n");
-    // fprintf(streamc, "ASCII\n");
-    // fprintf(streamc, "DATASET STRUCTURED_POINTS\n");
-    // fprintf(streamc, "DIMENSIONS %d %d %d\n", NDX, NDY, NDZ);
-    // fprintf(streamc, "ORIGIN 0.0 0.0 0.0\n");
-    // fprintf(streamc, "ASPECT_RATIO 1.0 1.0 1.0\n");
-    // fprintf(streamc, "\n");
-    // fprintf(streamc, "POINT_DATA %d\n", NDX * NDY * NDZ);
-    // fprintf(streamc, "SCALARS scalars float\n");
-    // fprintf(streamc, "LOOKUP_TABLE default\n");
-    // fclose(streamc);
+    FILE *streamc;
+    char bufferc[30];
+    sprintf(bufferc, "data/con/passed.vtk");
+    streamc = fopen(bufferc, "a");
+    fprintf(streamc, "# vtk DataFile Version 1.0\n");
+    fprintf(streamc, "passed.vtk\n");
+    fprintf(streamc, "ASCII\n");
+    fprintf(streamc, "DATASET STRUCTURED_POINTS\n");
+    fprintf(streamc, "DIMENSIONS %d %d %d\n", NDX, NDY, NDZ);
+    fprintf(streamc, "ORIGIN 0.0 0.0 0.0\n");
+    fprintf(streamc, "ASPECT_RATIO 1.0 1.0 1.0\n");
+    fprintf(streamc, "\n");
+    fprintf(streamc, "POINT_DATA %d\n", NDX * NDY * NDZ);
+    fprintf(streamc, "SCALARS scalars float\n");
+    fprintf(streamc, "LOOKUP_TABLE default\n");
+    fclose(streamc);
 
 #pragma omp parallel num_threads(NTH)
     {
@@ -311,30 +313,10 @@ int main(void)
         int ix, ixm, ixp, iy, iym, iyp, iz, izm, izp;
         int ii, jj, kk;
         int n1, n2, n3, phinum;
+
         double cddtt, sumcs, sumcl, con0izp;
+
         double dF, pddtt, psum, dsum;
-
-        double phidx, phidy, phidz;
-        double phidxx, phidyy, phidzz;
-        double phidxy, phidxz, phidyz;
-        double phiabs;
-
-        double th, vp, eta;
-        double epsilon0;
-
-        double xxp, xyp, xzp, yxp, yyp, yzp, zxp, zyp, zzp;
-        double phidxp, phidyp, phidzp;
-        double phidxpx, phidypx, phidzpx;
-        double phidxpy, phidypy, phidzpy;
-        double phidxpz, phidypz, phidzpz;
-
-        double ep, epdx, epdy, epdz;
-
-        double term0;
-        double termx, termx0, termx1, termx0dx, termx1dx;
-        double termy, termy0, termy1, termy0dy, termy1dy;
-        double termz, termz0, termz1, termz0dz, termz1dz;
-
         double termiikk, termjjkk;
 
         istep = 0;
@@ -353,10 +335,10 @@ int main(void)
         // ---------------------------------  Output the calculation data  ------------------------------------
         if ((istep % pstep == 0) && (th_id == 0))
         {
-            // intpass = frapass + intpos - NDZ / 4;
-            // curpos = intpass;
-            // invV = double(pstep) / double(curpos - prepos);
-            // prepos = curpos;
+            intpass = frapass + intpos - NDZ / 4;
+            curpos = intpass;
+            invV = double(pstep) / double(curpos - prepos);
+            prepos = curpos;
             datasave(istep);
             cout << istep << " steps(" << istep * dtime << " seconds) has done!" << endl;
             cout << "--" << endl;
@@ -432,157 +414,9 @@ int main(void)
                             {
                                 kk = phiIdx[n3][ix][iy][iz];
 
-                                phidx = (phi[kk][ixp][iy][iz] - phi[kk][ixm][iy][iz]) / 2.0;
-                                phidy = (phi[kk][ix][iyp][iz] - phi[kk][ix][iym][iz]) / 2.0;
-                                phidz = (phi[kk][ix][iy][izp] - phi[kk][ix][iy][izm]) / 2.0;
+                                termiikk = aij[ii][kk] * (phi[kk][ixp][iy][iz] + phi[kk][ixm][iy][iz] + phi[kk][ix][iyp][iz] + phi[kk][ix][iym][iz] + phi[kk][ix][iy][izp] + phi[kk][ix][iy][izm] - 6.0 * phi[kk][ix][iy][iz]) / (dx * dx);
 
-                                phidxx = (phi[kk][ixp][iy][iz] + phi[kk][ixm][iy][iz] - 2.0 * phi[kk][ix][iy][iz]);
-                                phidyy = (phi[kk][ix][iyp][iz] + phi[kk][ix][iym][iz] - 2.0 * phi[kk][ix][iy][iz]);
-                                phidzz = (phi[kk][ix][iy][izp] + phi[kk][ix][iy][izm] - 2.0 * phi[kk][ix][iy][iz]);
-
-                                phidxy = (phi[kk][ixp][iyp][iz] + phi[kk][ixm][iym][iz] - phi[kk][ixm][iyp][iz] - phi[kk][ixp][iym][iz]) / 4.0;
-                                phidxz = (phi[kk][ixp][iy][izp] + phi[kk][ixm][iy][izm] - phi[kk][ixm][iy][izp] - phi[kk][ixp][iy][izm]) / 4.0;
-                                phidyz = (phi[kk][ix][iyp][izp] + phi[kk][ix][iym][izm] - phi[kk][ix][iym][izp] - phi[kk][ix][iyp][izm]) / 4.0;
-
-                                phiabs = phidx * phidx + phidy * phidy + phidz * phidz;
-
-                                if (anij[ii][kk] == 1 && phiabs != 0.0)
-                                {
-                                    epsilon0 = sqrt(aij[ii][kk]);
-
-                                    th = thij[ii][kk];
-                                    vp = vpij[ii][kk];
-                                    eta = etaij[ii][kk];
-
-                                    xxp = cos(th) * cos(vp);
-                                    yxp = sin(th) * cos(vp);
-                                    zxp = sin(vp);
-                                    xyp = -sin(th) * cos(eta) - cos(th) * sin(vp) * sin(eta);
-                                    yyp = cos(th) * cos(eta) - sin(th) * sin(vp) * sin(eta);
-                                    zyp = cos(vp) * sin(eta);
-                                    xzp = sin(eta) * sin(th) - cos(eta) * cos(th) * sin(vp);
-                                    yzp = -sin(eta) * cos(th) - cos(eta) * sin(th) * sin(vp);
-                                    zzp = cos(eta) * cos(vp);
-
-                                    phidxp = phidx * xxp + phidy * yxp + phidz * zxp;
-                                    phidyp = phidx * xyp + phidy * yyp + phidz * zyp;
-                                    phidzp = phidx * xzp + phidy * yzp + phidz * zzp;
-
-                                    phidxpx = phidxx * xxp + phidxy * yxp + phidxz * zxp;
-                                    phidypx = phidxx * xyp + phidxy * yyp + phidxz * zyp;
-                                    phidzpx = phidxx * xzp + phidxy * yzp + phidxz * zzp;
-
-                                    phidxpy = phidxy * xxp + phidyy * yxp + phidyz * zxp;
-                                    phidypy = phidxy * xyp + phidyy * yyp + phidyz * zyp;
-                                    phidzpy = phidxy * xzp + phidyy * yzp + phidyz * zzp;
-
-                                    phidxpz = phidxz * xxp + phidyz * yxp + phidzz * zxp;
-                                    phidypz = phidxz * xyp + phidyz * yyp + phidzz * zyp;
-                                    phidzpz = phidxz * xzp + phidyz * yzp + phidzz * zzp;
-
-                                    ep = epsilon0 * (1.0 - 3.0 * astre + 4.0 * astre * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 2.0));
-
-                                    epdx = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpx + pow(phidyp, 3.0) * phidypx + pow(phidzp, 3.0) * phidzpx) / pow(phiabs, 2.0) - (phidx * phidxx + phidy * phidxy + phidz * phidxz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-                                    epdy = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpy + pow(phidyp, 3.0) * phidypy + pow(phidzp, 3.0) * phidzpy) / pow(phiabs, 2.0) - (phidx * phidxy + phidy * phidyy + phidz * phidyz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-                                    epdz = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpz + pow(phidyp, 3.0) * phidypz + pow(phidzp, 3.0) * phidzpz) / pow(phiabs, 2.0) - (phidx * phidxz + phidy * phidyz + phidz * phidzz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-
-                                    term0 = 2.0 * ep * epdx * phidx + phidxx * ep * ep + 2.0 * ep * epdy * phidy + phidyy * ep * ep + 2.0 * ep * epdz * phidz + phidzz * ep * ep;
-
-                                    termx0 = (pow(phidxp, 3.0) * xxp + pow(phidyp, 3.0) * xyp + pow(phidzp, 3.0) * xzp) / phiabs;
-                                    termy0 = (pow(phidxp, 3.0) * yxp + pow(phidyp, 3.0) * yyp + pow(phidzp, 3.0) * yzp) / phiabs;
-                                    termz0 = (pow(phidxp, 3.0) * zxp + pow(phidyp, 3.0) * zyp + pow(phidzp, 3.0) * zzp) / phiabs;
-
-                                    termx1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidx / pow(phiabs, 2.0);
-                                    termy1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidy / pow(phiabs, 2.0);
-                                    termz1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidz / pow(phiabs, 2.0);
-
-                                    termx0dx = (3.0 * pow(phidxp, 2.0) * phidxpx * xxp + 3.0 * pow(phidyp, 2.0) * phidypx * xyp + 3.0 * pow(phidzp, 2.0) * phidzpx * xzp) / phiabs - (2.0 * phidx * phidxx + 2.0 * phidy * phidxy + 2.0 * phidz * phidxz) * (pow(phidxp, 3.0) * xxp + pow(phidyp, 3.0) * xyp + pow(phidzp, 3.0) * xzp) / pow(phiabs, 2.0);
-                                    termy0dy = (3.0 * pow(phidxp, 2.0) * phidxpy * yxp + 3.0 * pow(phidyp, 2.0) * phidypy * yyp + 3.0 * pow(phidzp, 2.0) * phidzpy * yzp) / phiabs - (2.0 * phidx * phidxy + 2.0 * phidy * phidyy + 2.0 * phidz * phidyz) * (pow(phidxp, 3.0) * yxp + pow(phidyp, 3.0) * yyp + pow(phidzp, 3.0) * yzp) / pow(phiabs, 2.0);
-                                    termz0dz = (3.0 * pow(phidxp, 2.0) * phidxpz * zxp + 3.0 * pow(phidyp, 2.0) * phidypz * zyp + 3.0 * pow(phidzp, 2.0) * phidzpz * zzp) / phiabs - (2.0 * phidx * phidxz + 2.0 * phidy * phidyz + 2.0 * phidz * phidzz) * (pow(phidxp, 3.0) * zxp + pow(phidyp, 3.0) * zyp + pow(phidzp, 3.0) * zzp) / pow(phiabs, 2.0);
-
-                                    termx1dx = ((phidxx * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidx * (4.0 * pow(phidxp, 3.0) * phidxpx + 4.0 * pow(phidyp, 3.0) * phidypx + 4.0 * pow(phidzp, 3.0) * phidzpx))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxx + phidy * phidxy + phidz * phidxz) * phidx * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-                                    termy1dy = ((phidyy * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidy * (4.0 * pow(phidxp, 3.0) * phidxpy + 4.0 * pow(phidyp, 3.0) * phidypy + 4.0 * pow(phidzp, 3.0) * phidzpy))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxy + phidy * phidyy + phidz * phidyz) * phidy * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-                                    termz1dz = ((phidzz * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidz * (4.0 * pow(phidxp, 3.0) * phidxpz + 4.0 * pow(phidyp, 3.0) * phidypz + 4.0 * pow(phidzp, 3.0) * phidzpz))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxz + phidy * phidyz + phidz * phidzz) * phidz * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-
-                                    termx = 16.0 * epsilon0 * astre * (epdx * (termx0 - termx1) + ep * (termx0dx - termx1dx));
-                                    termy = 16.0 * epsilon0 * astre * (epdy * (termy0 - termy1) + ep * (termy0dy - termy1dy));
-                                    termz = 16.0 * epsilon0 * astre * (epdz * (termz0 - termz1) + ep * (termz0dz - termz1dz));
-
-                                    termiikk = term0 + termx + termy + termz;
-                                }
-                                else
-                                {
-                                    termiikk = aij[ii][kk] * (phidxx + phidyy + phidzz) / (dx * dx);
-                                }
-
-                                if (anij[jj][kk] == 1 && phiabs != 0.0)
-                                {
-                                    epsilon0 = sqrt(aij[jj][kk]);
-
-                                    th = thij[jj][kk];
-                                    vp = vpij[jj][kk];
-                                    eta = etaij[jj][kk];
-
-                                    xxp = cos(th) * cos(vp);
-                                    yxp = sin(th) * cos(vp);
-                                    zxp = sin(vp);
-                                    xyp = -sin(th) * cos(eta) - cos(th) * sin(vp) * sin(eta);
-                                    yyp = cos(th) * cos(eta) - sin(th) * sin(vp) * sin(eta);
-                                    zyp = cos(vp) * sin(eta);
-                                    xzp = sin(eta) * sin(th) - cos(eta) * cos(th) * sin(vp);
-                                    yzp = -sin(eta) * cos(th) - cos(eta) * sin(th) * sin(vp);
-                                    zzp = cos(eta) * cos(vp);
-
-                                    phidxp = phidx * xxp + phidy * yxp + phidz * zxp;
-                                    phidyp = phidx * xyp + phidy * yyp + phidz * zyp;
-                                    phidzp = phidx * xzp + phidy * yzp + phidz * zzp;
-
-                                    phidxpx = phidxx * xxp + phidxy * yxp + phidxz * zxp;
-                                    phidypx = phidxx * xyp + phidxy * yyp + phidxz * zyp;
-                                    phidzpx = phidxx * xzp + phidxy * yzp + phidxz * zzp;
-
-                                    phidxpy = phidxy * xxp + phidyy * yxp + phidyz * zxp;
-                                    phidypy = phidxy * xyp + phidyy * yyp + phidyz * zyp;
-                                    phidzpy = phidxy * xzp + phidyy * yzp + phidyz * zzp;
-
-                                    phidxpz = phidxz * xxp + phidyz * yxp + phidzz * zxp;
-                                    phidypz = phidxz * xyp + phidyz * yyp + phidzz * zyp;
-                                    phidzpz = phidxz * xzp + phidyz * yzp + phidzz * zzp;
-
-                                    ep = epsilon0 * (1.0 - 3.0 * astre + 4.0 * astre * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 2.0));
-
-                                    epdx = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpx + pow(phidyp, 3.0) * phidypx + pow(phidzp, 3.0) * phidzpx) / pow(phiabs, 2.0) - (phidx * phidxx + phidy * phidxy + phidz * phidxz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-                                    epdy = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpy + pow(phidyp, 3.0) * phidypy + pow(phidzp, 3.0) * phidzpy) / pow(phiabs, 2.0) - (phidx * phidxy + phidy * phidyy + phidz * phidyz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-                                    epdz = 16.0 * epsilon0 * astre * ((pow(phidxp, 3.0) * phidxpz + pow(phidyp, 3.0) * phidypz + pow(phidzp, 3.0) * phidzpz) / pow(phiabs, 2.0) - (phidx * phidxz + phidy * phidyz + phidz * phidzz) * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0));
-
-                                    term0 = 2.0 * ep * epdx * phidx + phidxx * ep * ep + 2.0 * ep * epdy * phidy + phidyy * ep * ep + 2.0 * ep * epdz * phidz + phidzz * ep * ep;
-
-                                    termx0 = (pow(phidxp, 3.0) * xxp + pow(phidyp, 3.0) * xyp + pow(phidzp, 3.0) * xzp) / phiabs;
-                                    termy0 = (pow(phidxp, 3.0) * yxp + pow(phidyp, 3.0) * yyp + pow(phidzp, 3.0) * yzp) / phiabs;
-                                    termz0 = (pow(phidxp, 3.0) * zxp + pow(phidyp, 3.0) * zyp + pow(phidzp, 3.0) * zzp) / phiabs;
-
-                                    termx1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidx / pow(phiabs, 2.0);
-                                    termy1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidy / pow(phiabs, 2.0);
-                                    termz1 = (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) * phidz / pow(phiabs, 2.0);
-
-                                    termx0dx = (3.0 * pow(phidxp, 2.0) * phidxpx * xxp + 3.0 * pow(phidyp, 2.0) * phidypx * xyp + 3.0 * pow(phidzp, 2.0) * phidzpx * xzp) / phiabs - (2.0 * phidx * phidxx + 2.0 * phidy * phidxy + 2.0 * phidz * phidxz) * (pow(phidxp, 3.0) * xxp + pow(phidyp, 3.0) * xyp + pow(phidzp, 3.0) * xzp) / pow(phiabs, 2.0);
-                                    termy0dy = (3.0 * pow(phidxp, 2.0) * phidxpy * yxp + 3.0 * pow(phidyp, 2.0) * phidypy * yyp + 3.0 * pow(phidzp, 2.0) * phidzpy * yzp) / phiabs - (2.0 * phidx * phidxy + 2.0 * phidy * phidyy + 2.0 * phidz * phidyz) * (pow(phidxp, 3.0) * yxp + pow(phidyp, 3.0) * yyp + pow(phidzp, 3.0) * yzp) / pow(phiabs, 2.0);
-                                    termz0dz = (3.0 * pow(phidxp, 2.0) * phidxpz * zxp + 3.0 * pow(phidyp, 2.0) * phidypz * zyp + 3.0 * pow(phidzp, 2.0) * phidzpz * zzp) / phiabs - (2.0 * phidx * phidxz + 2.0 * phidy * phidyz + 2.0 * phidz * phidzz) * (pow(phidxp, 3.0) * zxp + pow(phidyp, 3.0) * zyp + pow(phidzp, 3.0) * zzp) / pow(phiabs, 2.0);
-
-                                    termx1dx = ((phidxx * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidx * (4.0 * pow(phidxp, 3.0) * phidxpx + 4.0 * pow(phidyp, 3.0) * phidypx + 4.0 * pow(phidzp, 3.0) * phidzpx))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxx + phidy * phidxy + phidz * phidxz) * phidx * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-                                    termy1dy = ((phidyy * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidy * (4.0 * pow(phidxp, 3.0) * phidxpy + 4.0 * pow(phidyp, 3.0) * phidypy + 4.0 * pow(phidzp, 3.0) * phidzpy))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxy + phidy * phidyy + phidz * phidyz) * phidy * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-                                    termz1dz = ((phidzz * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) + phidz * (4.0 * pow(phidxp, 3.0) * phidxpz + 4.0 * pow(phidyp, 3.0) * phidypz + 4.0 * pow(phidzp, 3.0) * phidzpz))) / pow(phiabs, 2.0) - 4.0 * (phidx * phidxz + phidy * phidyz + phidz * phidzz) * phidz * (pow(phidxp, 4.0) + pow(phidyp, 4.0) + pow(phidzp, 4.0)) / pow(phiabs, 3.0);
-
-                                    termx = 16.0 * epsilon0 * astre * (epdx * (termx0 - termx1) + ep * (termx0dx - termx1dx));
-                                    termy = 16.0 * epsilon0 * astre * (epdy * (termy0 - termy1) + ep * (termy0dy - termy1dy));
-                                    termz = 16.0 * epsilon0 * astre * (epdz * (termz0 - termz1) + ep * (termz0dz - termz1dz));
-
-                                    termjjkk = term0 + termx + termy + termz;
-                                }
-                                else
-                                {
-                                    termjjkk = aij[jj][kk] * (phidxx + phidyy + phidzz) / (dx * dx);
-                                }
+                                termjjkk = aij[jj][kk] * (phi[kk][ixp][iy][iz] + phi[kk][ixm][iy][iz] + phi[kk][ix][iyp][iz] + phi[kk][ix][iym][iz] + phi[kk][ix][iy][izp] + phi[kk][ix][iy][izm] - 6.0 * phi[kk][ix][iy][iz]) / (dx * dx);
 
                                 dsum += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][ix][iy][iz];
                             }
@@ -822,8 +656,8 @@ int main(void)
         if (th_id == 0 && (istep > nstep / 5))
         {
             sum0 = 0.0;
-            // fs1 = 0.0;
-            // fs2 = 0.0;
+            fs1 = 0.0;
+            fs2 = 0.0;
             for (ix = 0; ix <= ndmx; ix++)
             {
                 for (iy = 0; iy <= ndmy; iy++)
@@ -831,8 +665,8 @@ int main(void)
                     for (iz = 0; iz <= ndmz; iz++)
                     {
                         sum0 += cont[ix][iy][iz];
-                        // fs1 += phi[1][ix][iy][iz];
-                        // fs2 += phi[2][ix][iy][iz];
+                        fs1 += phi[1][ix][iy][iz];
+                        fs2 += phi[2][ix][iy][iz];
                     }
                 }
             }
@@ -936,151 +770,151 @@ int main(void)
             }
         }
 
-        //         //----------------------------------------------  Moving frame  -----------------------------------------------
-        // #pragma omp barrier
-        //         if (th_id == 0)
-        //         {
-        //             // check if the bottom is solid
-        //             sumplane = 0.0;
-        //             for (ix = 0; ix <= ndmx; ix++)
-        //             {
-        //                 for (iy = 0; iy <= ndmy; iy++)
-        //                 {
-        //                     if (phi[0][ix][iy][0] != 0.0)
-        //                     {
-        //                         hasS = 0;
-        //                     }
-        //                     sumplane += phi[0][ix][iy][0];
-        //                     if ((sumplane == 0.0) && (iy == ndmy) && (ix == ndmx))
-        //                     {
-        //                         hasS = 1;
-        //                     }
-        //                 }
-        //             }
-        //             // search interface front
-        //             intpos = 0;
-        //             if (hasS == 1)
-        //             {
-        //                 allS = 1;
-        //                 for (iz = 0; iz <= ndmz; iz++)
-        //                 {
-        //                     if (allS == 0)
-        //                     {
-        //                         intpos = iz - 1;
-        //                         break;
-        //                     }
-        //                     for (ix = 0; ix <= ndmx; ix++)
-        //                     {
-        //                         for (iy = 0; iy <= ndmy; iy++)
-        //                         {
-        //                             if (phi[0][ix][iy][iz] > 0.0)
-        //                             {
-        //                                 allS = 0;
-        //                                 break;
-        //                             }
-        //                         }
-        //                         if (allS == 0)
-        //                         {
-        //                             break;
-        //                         }
-        //                     }
-        //                 }
+        //----------------------------------------------  Moving frame  -----------------------------------------------
+#pragma omp barrier
+        if (th_id == 0)
+        {
+            // check if the bottom is solid
+            sumplane = 0.0;
+            for (ix = 0; ix <= ndmx; ix++)
+            {
+                for (iy = 0; iy <= ndmy; iy++)
+                {
+                    if (phi[0][ix][iy][0] != 0.0)
+                    {
+                        hasS = 0;
+                    }
+                    sumplane += phi[0][ix][iy][0];
+                    if ((sumplane == 0.0) && (iy == ndmy) && (ix == ndmx))
+                    {
+                        hasS = 1;
+                    }
+                }
+            }
+            // search interface front
+            intpos = 0;
+            if (hasS == 1)
+            {
+                allS = 1;
+                for (iz = 0; iz <= ndmz; iz++)
+                {
+                    if (allS == 0)
+                    {
+                        intpos = iz - 1;
+                        break;
+                    }
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            if (phi[0][ix][iy][iz] > 0.0)
+                            {
+                                allS = 0;
+                                break;
+                            }
+                        }
+                        if (allS == 0)
+                        {
+                            break;
+                        }
+                    }
+                }
 
-        //                 allL = 0;
-        //                 for (iz = intpos; iz <= ndmx; iz++)
-        //                 {
-        //                     sumplane = 0.0;
-        //                     for (ix = 0; ix <= ndmx; ix++)
-        //                     {
-        //                         for (iy = 0; iy <= ndmy; iy++)
-        //                         {
-        //                             sumplane += phi[0][ix][iy][iz];
-        //                         }
-        //                     }
-        //                     if (sumplane == double(NDX * NDY))
-        //                     {
-        //                         allL = 1;
-        //                     }
-        //                     if (allL == 1)
-        //                     {
-        //                         intpos = iz;
-        //                         break;
-        //                     }
-        //                 }
-        //             }
-        //             // check the distance from the middle of the domain
-        //             if (intpos > mid)
-        //             {
-        //                 dist = intpos - mid;
-        //                 frapass += dist;
-        //                 cout << "--" << endl;
-        //                 cout << "    the distance away from middle is " << dist << endl;
-        //                 cout << "--" << endl;
-        //                 cout << "    the interface temperature is " << temp[NDX / 2][NDY / 2][mid] << endl;
+                allL = 0;
+                for (iz = intpos; iz <= ndmx; iz++)
+                {
+                    sumplane = 0.0;
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            sumplane += phi[0][ix][iy][iz];
+                        }
+                    }
+                    if (sumplane == double(NDX * NDY))
+                    {
+                        allL = 1;
+                    }
+                    if (allL == 1)
+                    {
+                        intpos = iz;
+                        break;
+                    }
+                }
+            }
+            // check the distance from the middle of the domain
+            if (intpos > mid)
+            {
+                dist = intpos - mid;
+                frapass += dist;
+                cout << "--" << endl;
+                cout << "    the distance away from middle is " << dist << endl;
+                cout << "--" << endl;
+                cout << "    the interface temperature is " << temp[NDX / 2][NDY / 2][mid] << endl;
 
-        //                 // write passed domain
-        //                 FILE *streamc;
-        //                 char bufferc[30];
-        //                 sprintf(bufferc, "data/con/passed.vtk");
-        //                 streamc = fopen(bufferc, "a");
+                // write passed domain
+                FILE *streamc;
+                char bufferc[30];
+                sprintf(bufferc, "data/con/passed.vtk");
+                streamc = fopen(bufferc, "a");
 
-        //                 for (iz = 0; iz < dist; iz++)
-        //                 {
-        //                     for (ix = 0; ix <= ndmx; ix++)
-        //                     {
-        //                         for (iy = 0; iy <= ndmy; iy++)
-        //                         {
-        //                             fprintf(streamc, "%e\n", cont[ix][iy][iz]);
-        //                         }
-        //                     }
-        //                 }
-        //                 fclose(streamc);
+                for (iz = 0; iz < dist; iz++)
+                {
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            fprintf(streamc, "%e\n", cont[ix][iy][iz]);
+                        }
+                    }
+                }
+                fclose(streamc);
 
-        //                 for (iz = 0; iz <= (ndmz - dist); iz++)
-        //                 {
-        //                     for (ix = 0; ix <= ndmx; ix++)
-        //                     {
-        //                         for (iy = 0; iy <= ndmy; iy++)
-        //                         {
-        //                             // temp
-        //                             temp[ix][iy][iz] = temp[ix][iy][iz + dist];
-        //                             // cont
-        //                             cont[ix][iy][iz] = cont[ix][iy][iz + dist];
-        //                             // phi
-        //                             phi[0][ix][iy][iz] = phi[0][ix][iy][iz + dist];
-        //                             phi[1][ix][iy][iz] = phi[1][ix][iy][iz + dist];
-        //                             phi[2][ix][iy][iz] = phi[2][ix][iy][iz + dist];
-        //                             // conp
-        //                             conp[0][ix][iy][iz] = conp[0][ix][iy][iz + dist];
-        //                             conp[1][ix][iy][iz] = conp[1][ix][iy][iz + dist];
-        //                             conp[2][ix][iy][iz] = conp[2][ix][iy][iz + dist];
-        //                         }
-        //                     }
-        //                 }
-        //                 for (iz = (ndmz - dist + 1); iz <= ndmz; iz++)
-        //                 {
-        //                     for (ix = 0; ix <= ndmx; ix++)
-        //                     {
-        //                         for (iy = 0; iy <= ndmy; iy++)
-        //                         {
-        //                             // temp
-        //                             temp[ix][iy][iz] = temp[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
-        //                             // cont
-        //                             // new liquid is flowing into the box
-        //                             cont[ix][iy][iz] = cl;
-        //                             // phi
-        //                             phi[0][ix][iy][iz] = 1.0;
-        //                             phi[1][ix][iy][iz] = 0.0;
-        //                             phi[2][ix][iy][iz] = 0.0;
-        //                             // conp
-        //                             conp[0][ix][iy][iz] = cl;
-        //                             conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
-        //                             conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //         }
+                for (iz = 0; iz <= (ndmz - dist); iz++)
+                {
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            // temp
+                            temp[ix][iy][iz] = temp[ix][iy][iz + dist];
+                            // cont
+                            cont[ix][iy][iz] = cont[ix][iy][iz + dist];
+                            // phi
+                            phi[0][ix][iy][iz] = phi[0][ix][iy][iz + dist];
+                            phi[1][ix][iy][iz] = phi[1][ix][iy][iz + dist];
+                            phi[2][ix][iy][iz] = phi[2][ix][iy][iz + dist];
+                            // conp
+                            conp[0][ix][iy][iz] = conp[0][ix][iy][iz + dist];
+                            conp[1][ix][iy][iz] = conp[1][ix][iy][iz + dist];
+                            conp[2][ix][iy][iz] = conp[2][ix][iy][iz + dist];
+                        }
+                    }
+                }
+                for (iz = (ndmz - dist + 1); iz <= ndmz; iz++)
+                {
+                    for (ix = 0; ix <= ndmx; ix++)
+                    {
+                        for (iy = 0; iy <= ndmy; iy++)
+                        {
+                            // temp
+                            temp[ix][iy][iz] = temp[ix][iy][ndmz - dist] + gradT * (iz - ndmz + dist) * dx;
+                            // cont
+                            // new liquid is flowing into the box
+                            cont[ix][iy][iz] = cl;
+                            // phi
+                            phi[0][ix][iy][iz] = 1.0;
+                            phi[1][ix][iy][iz] = 0.0;
+                            phi[2][ix][iy][iz] = 0.0;
+                            // conp
+                            conp[0][ix][iy][iz] = cl;
+                            conp[1][ix][iy][iz] = calC1e(temp[ix][iy][iz]);
+                            conp[2][ix][iy][iz] = calC2e(temp[ix][iy][iz]);
+                        }
+                    }
+                }
+            }
+        }
         istep = istep + 1;
 #pragma omp barrier
         if (istep < nstep)
@@ -1091,23 +925,23 @@ int main(void)
     }
 terminal:;
     // Add the current domain
-    // FILE *streamc;
-    // char bufferc[30];
-    // sprintf(bufferc, "data/con/passed.vtk");
-    // streamc = fopen(bufferc, "a");
+    FILE *streamc;
+    char bufferc[30];
+    sprintf(bufferc, "data/con/passed.vtk");
+    streamc = fopen(bufferc, "a");
 
-    // for (iz = 0; iz < ndmz; iz++)
-    // {
-    //     for (ix = 0; ix <= ndmx; ix++)
-    //     {
-    //         for (iy = 0; iy <= ndmy; iy++)
-    //         {
-    //             fprintf(streamc, "%e\n", cont[ix][iy][iz]);
-    //         }
-    //     }
-    // }
-    // fclose(streamc);
-    // cout << "The height of the passed frame is " << frapass << endl;
+    for (iz = 0; iz < ndmz; iz++)
+    {
+        for (ix = 0; ix <= ndmx; ix++)
+        {
+            for (iy = 0; iy <= ndmy; iy++)
+            {
+                fprintf(streamc, "%e\n", cont[ix][iy][iz]);
+            }
+        }
+    }
+    fclose(streamc);
+    cout << "The height of the passed frame is " << frapass << endl;
     return 0;
 }
 
@@ -1145,14 +979,14 @@ void datasave(int step)
     }
     fclose(streamc0);
 
-    // // write interface temperature
-    // FILE *streamit; //ストリームのポインタ設定
-    // char bufferit[30];
-    // sprintf(bufferit, "data/interface/int_temp.csv");
-    // streamit = fopen(bufferit, "a");
-    // fprintf(streamit, "%e   ", temp[NDX / 2][NDY / 2][mid]);
-    // fprintf(streamit, "\n");
-    // fclose(streamit); //ファイルをクローズ
+    // write interface temperature
+    FILE *streamit; //ストリームのポインタ設定
+    char bufferit[30];
+    sprintf(bufferit, "data/interface/int_temp.csv");
+    streamit = fopen(bufferit, "a");
+    fprintf(streamit, "%e   ", temp[NDX / 2][NDY / 2][mid]);
+    fprintf(streamit, "\n");
+    fclose(streamit); //ファイルをクローズ
 
     // write nominal concentration
     FILE *streamnc; //ストリームのポインタ設定
@@ -1164,21 +998,21 @@ void datasave(int step)
     fclose(streamnc); //ファイルをクローズ
 
     // write fraction of solid phases
-    // FILE *streamf1; //ストリームのポインタ設定
-    // char bufferf1[30];
-    // sprintf(bufferf1, "data/fraction/solid1.csv");
-    // streamf1 = fopen(bufferf1, "a");
-    // fprintf(streamf1, "%e   ", fs1 / (fs1 + fs2));
-    // fprintf(streamf1, "\n");
-    // fclose(streamf1); //ファイルをクローズ
+    FILE *streamf1; //ストリームのポインタ設定
+    char bufferf1[30];
+    sprintf(bufferf1, "data/fraction/solid1.csv");
+    streamf1 = fopen(bufferf1, "a");
+    fprintf(streamf1, "%e   ", fs1 / (fs1 + fs2));
+    fprintf(streamf1, "\n");
+    fclose(streamf1); //ファイルをクローズ
 
-    // FILE *streamiv;
-    // char bufferiv[30];
-    // sprintf(bufferiv, "data/interface/int_vel.csv");
-    // streamiv = fopen(bufferiv, "a");
-    // fprintf(streamiv, "%e   ", invV);
-    // fprintf(streamiv, "\n");
-    // fclose(streamiv);
+    FILE *streamiv;
+    char bufferiv[30];
+    sprintf(bufferiv, "data/interface/int_vel.csv");
+    streamiv = fopen(bufferiv, "a");
+    fprintf(streamiv, "%e   ", invV);
+    fprintf(streamiv, "\n");
+    fclose(streamiv);
 }
 
 double calC01e(double temp0)
