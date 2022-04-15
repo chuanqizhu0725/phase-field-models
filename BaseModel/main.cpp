@@ -1,6 +1,11 @@
 
 #include "header.h"
 
+double ****phi, ****phi2;
+int ***phiNum, ****phiIdx;
+double **aij, **wij, **mij, **fij;
+double **anij, **thij, **vpij, **etaij;
+
 int main(int argc, char *argv[])
 {
     phi = new double ***[N];
@@ -50,17 +55,26 @@ int main(int argc, char *argv[])
     wij = new double *[N];
     mij = new double *[N];
     fij = new double *[N];
+    anij = new double *[N];
+    thij = new double *[N];
+    vpij = new double *[N];
+    etaij = new double *[N];
     for (ni = 0; ni <= nm; ni++)
     {
         aij[ni] = new double[N];
         wij[ni] = new double[N];
         mij[ni] = new double[N];
         fij[ni] = new double[N];
+        anij[ni] = new double[N];
+        thij[ni] = new double[N];
+        vpij[ni] = new double[N];
+        etaij[ni] = new double[N];
     }
 
     PhaseParameters(delta, gamma0, mobi, temp,
                     A0, W0, M0, F0,
                     aij, wij, mij, fij,
+                    anij, thij, vpij, etaij,
                     ni, nj, nm);
 
     RandomSeeds(phi,
@@ -93,6 +107,7 @@ int main(int argc, char *argv[])
 
         ComputePhaseFields(phi, phi2, phiNum, phiIdx,
                            aij, wij, mij, fij,
+                           anij, vpij, etaij, thij, astre,
                            start, end, ndmx, ndmy, ndmz, dtime,
                            ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
                            ii, jj, kk, n1, n2, n3, nm,
@@ -107,10 +122,10 @@ int main(int argc, char *argv[])
     end:;
     }
 
-    // SavaData3D(phi,
-    //            NDX, NDY, NDZ,
-    //            ndmx, ndmy, ndmz,
-    //            nm, i, j, k);
+    SavaData3D(phi,
+               NDX, NDY, NDZ,
+               ndmx, ndmy, ndmz,
+               nm, i, j, k);
 
     // SavaData2D(phi,
     //            NDX, NDY, NDZ,
