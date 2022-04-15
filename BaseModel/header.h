@@ -6,43 +6,15 @@
 #include <fstream>
 #include <sstream>
 #include <omp.h>
+#include "CImg.h" //CImg ライブラリ（描画用）使用のためのヘッダ
 
 using namespace std;
+using namespace cimg_library;
 
 #define PI 3.141592
 #define RR 8.3145
 
-int N = 2;
-int NTH = 8;
-int NDX = 64;
-int NDY = 64;
-int NDZ = 64;
-int ndx = NDX;
-int ndy = NDY;
-int ndz = NDZ;
-int ndmx = NDX - 1;
-int ndmy = NDY - 1;
-int ndmz = NDZ - 1;
-int nm = N - 1;
-
-int nstep = 401;
-double dx0 = 2.0e-8;
-double dx = 1.0;
-double dtime = 5.0;
-double temp = 1000.0;
-double vm0 = 7.0e-6;
-double delta = 7.0;
-double mobi = 1.0;
-double astre = 0.05;
-double astrem = 0.3;
-double gamma0 = 0.5 * vm0 / RR / temp / dx0;
-
-int i, j, k, ni, nj;
-int xx0, yy0, zz0;
-double r0, r;
-double M0, W0, A0, F0;
-
-void PhaseParameters(double delta, double gamma0, double mobi, double temp,
+void PhaseProperties(double delta, double gamma0, double mobi, double temp,
                      double A0, double W0, double M0, double F0,
                      double **aij, double **wij, double **mij, double **fij,
                      double **anij, double **thij, double **vpij, double **etaij,
@@ -137,6 +109,10 @@ void RandomSeeds(double ****phi,
     }
 }
 
+void Temperature()
+{
+}
+
 void CenterSeed(double ****phi,
                 int NDX, int NDY, int NDZ, int ndmx, int ndmy, int ndmz,
                 int i, int j, int k, int nm,
@@ -228,8 +204,8 @@ void CollectPhaseFields(double ****phi, int ***phiNum, int ****phiIdx,
 
 void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****phiIdx,
                         double **aij, double **wij, double **mij, double **fij,
-                        double **anij, double **thij, double **vpij, double **etaij, double astre,
-                        int start, int end, int ndmx, int ndmy, int ndmz, double dtime,
+                        double **anij, double **thij, double **vpij, double **etaij, double astre, double astrem,
+                        int start, int end, int ndmx, int ndmy, int ndmz, double dtime, double dx,
                         int ix, int iy, int iz, int ixp, int ixm, int iyp, int iym, int izp, int izm,
                         int ii, int jj, int kk, int n1, int n2, int n3, int nm,
                         double pddtt, double intsum, double psum)
@@ -555,14 +531,201 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
     }
 }
 
-void SavaData3D(double ****phi,
+void SolutePartition(double ****conp, double ***cont, double ***cont2, double ****phi, double ***temp,
+                     int start, int end, int ndmx, int ndmy, int ndmz, double dtime, double dx,
+                     int ix, int iy, int iz, int ixp, int ixm, int iyp, int iym, int izp, int izm,
+                     double Te, double ce, double ml1, double kap1, double ml2, double kap2)
+{
+    // --------------------- Calculate concentration  --------------------------
+    for (ix = start; ix <= end; ix++)
+    {
+        for (iy = 0; iy <= ndmy; iy++)
+        {
+            for (iz = 0; iz <= ndmz; iz++)
+            {
+                ixp = ix + 1;
+                ixm = ix - 1;
+                iyp = iy + 1;
+                iym = iy - 1;
+                izp = iz + 1;
+                izm = iz - 1;
+                if (ix == ndmx)
+                {
+                    ixp = 0;
+                }
+                if (ix == 0)
+                {
+                    ixm = ndmx;
+                }
+                if (iy == ndmy)
+                {
+                    iyp = 0;
+                }
+                if (iy == 0)
+                {
+                    iym = ndmy;
+                }
+                if (iz == ndmz)
+                {
+                    izp = ndmz;
+                }
+                if (iz == 0)
+                {
+                    izm = 0;
+                }
+
+                // Calculate equilirium concentration
+                double c1e = (ce + (temp0 - Te) / ml1) * kap1;
+                double c01e = ce + (temp0 - Te) / ml1;
+                double c2e = 1.0 - (1.0 - (ce + (temp0 - Te) / ml2)) * kap2;
+                double c02e = ce + (temp0 - Te) / ml2;
+
+                if (phi[0][ix][iy][iz] == 0.0)
+                {
+                    if (phi[1][ix][iy][iz] == 1.0)
+                    {
+                        conp[1][ix][iy][iz] = cont[ix][iy][iz];
+                    }
+                    else
+                    {
+                        conp[1][ix][iy][iz] = c1e;
+                    }
+                    if (phi[2][ix][iy][iz] == 1.0)
+                    {
+                        conp[2][ix][iy][iz] = cont[ix][iy][iz];
+                    }
+                    else
+                    {
+                        conp[2][ix][iy][iz] = c2e;
+                    }
+                    // Correct abnormal calculation at solid edge
+                    if ((phi[0][ixp][iy][iz] > 0.0) || (phi[0][ixm][iy][iz] > 0.0) || (phi[0][ix][iyp][iz] > 0.0) || (phi[0][ix][iym][iz] > 0.0) || (phi[0][ix][iy][izp] > 0.0) || (phi[0][ix][iy][izm] > 0.0))
+                    {
+                        conp[1][ix][iy][iz] = c1e;
+                        conp[2][ix][iy][iz] = c2e;
+                    }
+                    conp[0][ix][iy][iz] = c01e * phi[1][ix][iy][iz] + c02e * phi[2][ix][iy][iz];
+                }
+                else if (phi[0][ix][iy][iz] > 0.0 && phi[0][ix][iy][iz] < 1.0)
+                {
+                    conp[1][ix][iy][iz] = c1e;
+                    conp[2][ix][iy][iz] = c2e;
+                    conp[0][ix][iy][iz] = (cont[ix][iy][iz] - conp[1][ix][iy][iz] * phi[1][ix][iy][iz] - conp[2][ix][iy][iz] * phi[2][ix][iy][iz]) / phi[0][ix][iy][iz];
+                    // Correct abnormal calculation at liquid edge
+                    if (phi[0][ix][iy][iz] < 0.05)
+                    {
+                        conp[0][ix][iy][iz] = (c01e * phi[1][ix][iy][iz] + c02e * phi[2][ix][iy][iz]) / (phi[1][ix][iy][iz] + phi[2][ix][iy][iz]);
+                    }
+                    if (conp[0][ix][iy][iz] > 1.0)
+                    {
+                        conp[0][ix][iy][iz] = 1.0;
+                    }
+                    if (conp[0][ix][iy][iz] < 0.0)
+                    {
+                        conp[0][ix][iy][iz] = 0.0;
+                    }
+                }
+                else if (phi[0][ix][iy][iz] == 1.0)
+                {
+                    conp[1][ix][iy][iz] = c1e;
+                    conp[2][ix][iy][iz] = c2e;
+                    conp[0][ix][iy][iz] = cont[ix][iy][iz];
+                }
+                cont[ix][iy][iz] = conp[1][ix][iy][iz] * phi[1][ix][iy][iz] + conp[2][ix][iy][iz] * phi[2][ix][iy][iz] + conp[0][ix][iy][iz] * phi[0][ix][iy][iz];
+                if (cont[ix][iy][iz] > 1.0)
+                {
+                    cont[ix][iy][iz] = 1.0;
+                }
+                if (cont[ix][iy][iz] < 0.0)
+                {
+                    cont[ix][iy][iz] = 0.0;
+                }
+            }
+        }
+    }
+}
+
+void ComputeConcentration(double ****conp, double ***cont, double ***cont2, double ****phi,
+                          int start, int end, int ndmx, int ndmy, int ndmz, double dtime, double dx,
+                          int ix, int iy, int iz, int ixp, int ixm, int iyp, int iym, int izp, int izm,
+                          int ii, int nm,
+                          double sumcl, double sumcs, double cddtt,
+                          double Ds, double Dl)
+{
+    for (ix = start; ix <= end; ix++)
+    {
+        for (iy = 0; iy <= ndmy; iy++)
+        {
+            for (iz = 0; iz <= ndmz; iz++)
+            {
+                ixp = ix + 1;
+                ixm = ix - 1;
+                iyp = iy + 1;
+                iym = iy - 1;
+                izp = iz + 1;
+                izm = iz - 1;
+                if (ix == ndmx)
+                {
+                    ixp = 0;
+                }
+                if (ix == 0)
+                {
+                    ixm = ndmx;
+                }
+                if (iy == ndmy)
+                {
+                    iyp = 0;
+                }
+                if (iy == 0)
+                {
+                    iym = ndmy;
+                }
+                if (iz == ndmz)
+                {
+                    izp = ndmz;
+                }
+                if (iz == 0)
+                {
+                    izm = 0;
+                }
+                //拡散方程式内における微分計算
+                for (ii = 1; ii < nm; ii++)
+                {
+                    sumcs = 0.25 * ((phi[ii][ixp][iy][iz] - phi[ii][ixm][iy][iz]) * (conp[ii][ixp][iy][iz] - conp[ii][ixm][iy][iz]) + (phi[ii][ix][iyp][iz] - phi[ii][ix][iym][iz]) * (conp[ii][ix][iyp][iz] - conp[ii][ix][iym][iz]) + (phi[ii][ix][iy][izp] - phi[ii][ix][iy][izm]) * (conp[ii][ix][iy][izp] - conp[ii][ix][iy][izm])) / dx / dx +
+                            phi[ii][ix][iy][iz] * (conp[ii][ixp][iy][iz] + conp[ii][ixm][iy][iz] + conp[ii][ix][iyp][iz] + conp[ii][ix][iym][iz] + conp[ii][ix][iy][izp] + conp[ii][ix][iy][izm] - 6.0 * conp[ii][ix][iy][iz]) / dx / dx;
+                }
+                sumcl = 0.25 * ((phi[0][ixp][iy][iz] - phi[0][ixm][iy][iz]) * (conp[0][ixp][iy][iz] - conp[0][ixm][iy][iz]) + (phi[0][ix][iyp][iz] - phi[0][ix][iym][iz]) * (conp[0][ix][iyp][iz] - conp[0][ix][iym][iz]) + (phi[0][ix][iy][izp] - phi[0][ix][iy][izm]) * (conp[0][ix][iy][izp] - conp[0][ix][iy][izm])) / dx / dx +
+                        phi[0][ix][iy][iz] * (conp[0][ixp][iy][iz] + conp[0][ixm][iy][iz] + conp[0][ix][iyp][iz] + conp[0][ix][iym][iz] + conp[0][ix][iy][izp] + conp[0][ix][iy][izm] - 6.0 * conp[0][ix][iy][iz]) / dx / dx;
+                cddtt = Ds * sumcs + Dl * sumcl;
+                cont2[ix][iy][iz] = cont[ix][iy][iz] + cddtt * dtime;
+                // ch2[i][j] = ch[i][j] + cddtt * dtime + (2. * DRND(1.) - 1.) * 0.001; //濃度場の時間発展(陽解法)
+            }
+        }
+    }
+
+    for (ix = start; ix <= end; ix++)
+    {
+        for (iy = 0; iy <= ndmy; iy++)
+        {
+            for (iz = 0; iz <= ndmz; iz++)
+            {
+                cont[ix][iy][iz] = cont2[ix][iy][iz];
+            }
+        }
+    }
+}
+void ComputeTemperature()
+{
+}
+
+void SavaData3D(double ****phi, int istep,
                 int NDX, int NDY, int NDZ,
                 int ndmx, int ndmy, int ndmz,
                 int nm, int i, int j, int k)
 {
     FILE *stream;
     char buffer[30];
-    sprintf(buffer, "3d.vtk");
+    sprintf(buffer, "data/phi/3d%d.vtk", istep);
     stream = fopen(buffer, "a");
 
     fprintf(stream, "# vtk DataFile Version 1.0\n");
@@ -589,14 +752,14 @@ void SavaData3D(double ****phi,
     fclose(stream);
 }
 
-void SavaData2D(double ****phi,
+void SavaData2D(double ****phi, int istep,
                 int NDX, int NDY, int NDZ,
                 int ndmx, int ndmy, int ndmz,
                 int nm, int i, int j, int k)
 {
     FILE *stream;
     char buffer[30];
-    sprintf(buffer, "2d.csv");
+    sprintf(buffer, "2d%d.csv", istep);
     stream = fopen(buffer, "a");
 
     for (i = 0; i <= ndmx; i++)
@@ -609,14 +772,14 @@ void SavaData2D(double ****phi,
     fclose(stream);
 }
 
-void SavaData1D(double ****phi,
+void SavaData1D(double ****phi, int istep,
                 int NDX, int NDY, int NDZ,
                 int ndmx, int ndmy, int ndmz,
                 int nm, int i, int j, int k)
 {
     FILE *stream;
     char buffer[30];
-    sprintf(buffer, "2d.csv");
+    sprintf(buffer, "2d%d.csv", istep);
     stream = fopen(buffer, "a");
 
     for (i = 0; i <= ndmx; i++)
