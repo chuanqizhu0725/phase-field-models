@@ -18,7 +18,7 @@ int nm = N - 1;
 int ndm = ND - 1;
 int mid = ND / 4;
 
-int nstep = 5000001;
+int nstep = 2000001;
 int pstep = 100000;
 
 double dx = 1.0e-5;
@@ -42,10 +42,10 @@ double Cdt_l = kap_l / sph_l;
 double dH = 4.122e9;
 
 double Tg = 8.0e3;
-double Tv = 2.0e-4;
+double Tv = 0.5e-4;
 double Tr = Tg * Tv;
 
-double T_left = 1674.0 - ND / 4 * dx * Tg;
+double T_left = 1682.09 - ND / 4 * dx * Tg;
 double T_right = T_left + Tg * ND * dx;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];
@@ -211,7 +211,7 @@ start:;
             // termperature increase from release of latent heat
             if (ii == 1)
             {
-                temp[i] += pddtt * dtime * dH / sph_s;
+                temp[i] += pddtt * dtime * dH * 1.5 / sph_s;
             }
         }
     } // i
