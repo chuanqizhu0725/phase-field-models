@@ -77,10 +77,15 @@ int main(int argc, char *argv[])
                     anij, thij, vpij, etaij,
                     ni, nj, nm);
 
-    RandomSeeds(phi,
-                NDX, NDY, NDZ, ndmx, ndmy, ndmz,
-                i, j, k, ni, nj, nm,
-                r0, r, xx0, yy0, zz0);
+    // RandomSeeds(phi,
+    //             NDX, NDY, NDZ, ndmx, ndmy, ndmz,
+    //             i, j, k, ni, nj, nm,
+    //             r0, r, xx0, yy0, zz0);
+
+    CenterSeed(phi,
+               NDX, NDY, NDZ, ndmx, ndmy, ndmz,
+               i, j, k, nm,
+               NDX / 8, r, NDX / 2, NDY / 2, NDZ / 2);
 
     int rows = NDX / NTH;
 
@@ -107,7 +112,7 @@ int main(int argc, char *argv[])
 
         ComputePhaseFields(phi, phi2, phiNum, phiIdx,
                            aij, wij, mij, fij,
-                           anij, vpij, etaij, thij, astre,
+                           anij, thij, vpij, etaij, astre,
                            start, end, ndmx, ndmy, ndmz, dtime,
                            ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
                            ii, jj, kk, n1, n2, n3, nm,

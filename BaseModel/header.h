@@ -12,7 +12,7 @@ using namespace std;
 #define PI 3.141592
 #define RR 8.3145
 
-int N = 3;
+int N = 2;
 int NTH = 8;
 int NDX = 64;
 int NDY = 64;
@@ -34,6 +34,7 @@ double vm0 = 7.0e-6;
 double delta = 7.0;
 double mobi = 1.0;
 double astre = 0.05;
+double astrem = 0.3;
 double gamma0 = 0.5 * vm0 / RR / temp / dx0;
 
 int i, j, k, ni, nj;
@@ -136,6 +137,33 @@ void RandomSeeds(double ****phi,
     }
 }
 
+void CenterSeed(double ****phi,
+                int NDX, int NDY, int NDZ, int ndmx, int ndmy, int ndmz,
+                int i, int j, int k, int nm,
+                double r0, double r, int xx0, int yy0, int zz0)
+{
+    for (i = 0; i <= ndmx; i++)
+    {
+        for (j = 0; j <= ndmy; j++)
+        {
+            for (k = 0; k <= ndmz; k++)
+            {
+                r = sqrt((i - xx0) * (i - xx0) + (j - yy0) * (j - yy0) + (k - zz0) * (k - zz0));
+                if (r < r0)
+                {
+                    phi[nm][i][j][k] = 1.0;
+                    phi[0][i][j][k] = 0.0;
+                }
+                else
+                {
+                    phi[0][i][j][k] = 1.0;
+                    phi[nm][i][j][k] = 0.0;
+                }
+            }
+        }
+    }
+}
+
 void CollectPhaseFields(double ****phi, int ***phiNum, int ****phiIdx,
                         int start, int end, int ndmx, int ndmy, int ndmz,
                         int ix, int iy, int iz, int ixp, int ixm, int iyp, int iym, int izp, int izm,
@@ -200,7 +228,7 @@ void CollectPhaseFields(double ****phi, int ***phiNum, int ****phiIdx,
 
 void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****phiIdx,
                         double **aij, double **wij, double **mij, double **fij,
-                        double **anij, double **vpij, double **etaij, double **thij, double astre,
+                        double **anij, double **thij, double **vpij, double **etaij, double astre,
                         int start, int end, int ndmx, int ndmy, int ndmz, double dtime,
                         int ix, int iy, int iz, int ixp, int ixm, int iyp, int iym, int izp, int izm,
                         int ii, int jj, int kk, int n1, int n2, int n3, int nm,
@@ -209,15 +237,19 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
 
     // *************  For anisotropy calculation **************
     double phidx, phidy, phidz;
+    double phidxii, phidyii, phidzii;
     double phidxx, phidyy, phidzz;
     double phidxy, phidxz, phidyz;
-    double phiabs;
+    double phiabs, phiabsii;
 
     double th, vp, eta;
+    double thii, vpii, etaii;
     double epsilon0;
 
     double xxp, xyp, xzp, yxp, yyp, yzp, zxp, zyp, zzp;
+    double xxpii, xypii, xzpii, yxpii, yypii, yzpii, zxpii, zypii, zzpii;
     double phidxp, phidyp, phidzp;
+    double phidxpii, phidypii, phidzpii;
     double phidxpx, phidypx, phidzpx;
     double phidxpy, phidypy, phidzpy;
     double phidxpz, phidypz, phidzpz;
@@ -230,6 +262,8 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
     double termz, termz0, termz1, termz0dz, termz1dz;
 
     double termiikk, termjjkk;
+
+    double miijj;
     // *************  For anisotropy calculation **************
 
     for (ix = start; ix <= end; ix++)
@@ -272,6 +306,12 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
                 for (n1 = 1; n1 <= phiNum[ix][iy][iz]; n1++)
                 {
                     ii = phiIdx[n1][ix][iy][iz];
+
+                    phidxii = (phi[ii][ixp][iy][iz] - phi[ii][ixm][iy][iz]) / 2.0 / dx;
+                    phidyii = (phi[ii][ix][iyp][iz] - phi[ii][ix][iym][iz]) / 2.0 / dx;
+                    phidzii = (phi[ii][ix][iy][izp] - phi[ii][ix][iy][izm]) / 2.0 / dx;
+                    phiabsii = phidxii * phidxii + phidyii * phidyii + phidzii * phidzii;
+
                     pddtt = 0.0;
                     for (n2 = 1; n2 <= phiNum[ix][iy][iz]; n2++)
                     {
@@ -435,10 +475,37 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
                             }
                             // ************************************************************
 
-                            intsum += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][ix][iy][iz]; //[式(4.31)の一部]
+                            intsum += 0.5 * (termiikk - termjjkk) + (wij[ii][kk] - wij[jj][kk]) * phi[kk][ix][iy][iz];
+                        } // kk
+
+                        thii = thij[ii][jj];
+                        vpii = vpij[ii][jj];
+                        etaii = etaij[ii][jj];
+
+                        xxpii = cos(thii) * cos(vpii);
+                        yxpii = sin(thii) * cos(vpii);
+                        zxpii = sin(vpii);
+                        xypii = -sin(thii) * cos(etaii) - cos(thii) * sin(vpii) * sin(etaii);
+                        yypii = cos(thii) * cos(etaii) - sin(thii) * sin(vpii) * sin(etaii);
+                        zypii = cos(vpii) * sin(etaii);
+                        xzpii = sin(etaii) * sin(thii) - cos(etaii) * cos(thii) * sin(vpii);
+                        yzpii = -sin(etaii) * cos(thii) - cos(etaii) * sin(thii) * sin(vpii);
+                        zzpii = cos(etaii) * cos(vpii);
+
+                        phidxpii = phidxii * xxpii + phidyii * yxpii + phidzii * zxpii;
+                        phidypii = phidxii * xypii + phidyii * yypii + phidzii * zypii;
+                        phidzpii = phidxii * xzpii + phidyii * yzpii + phidzii * zzpii;
+
+                        if (anij[ii][jj] == 1.0 && phiabsii != 0.0)
+                        {
+                            miijj = mij[ii][jj] * (1.0 - 3.0 * astrem + 4.0 * astrem * (pow(phidxpii, 4.0) + pow(phidypii, 4.0) + pow(phidzpii, 4.0)) / pow(phiabsii, 2.0));
                         }
-                        pddtt += -2.0 * mij[ii][jj] / double(phiNum[ix][iy][iz]) * (intsum - 8.0 / PI * fij[ii][jj] * sqrt(phi[ii][ix][iy][iz] * phi[jj][ix][iy][iz]));
-                    }
+                        else
+                        {
+                            miijj = mij[ii][jj];
+                        }
+                        pddtt += -2.0 * miijj / double(phiNum[ix][iy][iz]) * (intsum - 8.0 / PI * fij[ii][jj] * sqrt(phi[ii][ix][iy][iz] * phi[jj][ix][iy][iz]));
+                    } // jj
                     phi2[ii][ix][iy][iz] = phi[ii][ix][iy][iz] + pddtt * dtime;
                     if (phi2[ii][ix][iy][iz] >= 1.0)
                     {
@@ -448,9 +515,9 @@ void ComputePhaseFields(double ****phi, double ****phi2, int ***phiNum, int ****
                     {
                         phi2[ii][ix][iy][iz] = 0.0;
                     }
-                }
-            } // j
-        }     // i
+                } // ii
+            }     // j
+        }         // i
     }
 
     //
