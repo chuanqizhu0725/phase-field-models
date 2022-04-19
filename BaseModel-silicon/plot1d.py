@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-nx = 128
+nx = 100
 ny = 1
 ns = 100000
 step_arr = np.arange(0, ns*10, ns)

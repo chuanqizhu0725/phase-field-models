@@ -33,19 +33,19 @@ double M0 = mobi * PI * PI / (8.0 * delta);
 
 double Tm = 1687.0;
 double sph_s = 2.29e6;
-double kap_s = 22;
+double kap_s = 22.0;
 double sph_l = 2.53e6;
-double kap_l = 54;
+double kap_l = 54.0;
 
 double Cdt_s = kap_s / sph_s;
 double Cdt_l = kap_l / sph_l;
 double dH = 4.122e9;
 
 double Tg = 8.0e3;
-double Tv = 0.5e-4;
+double Tv = 1.5e-4;
 double Tr = Tg * Tv;
 
-double T_left = 1682.09 - ND / 4 * dx * Tg;
+double T_left = 1672.52 - ND / 4 * dx * Tg;
 double T_right = T_left + Tg * ND * dx;
 
 double mij[N][N], aij[N][N], wij[N][N], fij[N][N];

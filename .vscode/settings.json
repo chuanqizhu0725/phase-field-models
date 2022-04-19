@@ -81,7 +81,10 @@
     "stop_token": "cpp",
     "lateruse": "cpp",
     "stdio.h": "c",
-    "stdlib.h": "c"
+    "stdlib.h": "c",
+    "__tree": "cpp",
+    "map": "cpp",
+    "cinttypes": "cpp"
   },
   "C_Cpp.errorSquiggles": "Disabled"
 }

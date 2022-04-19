@@ -859,6 +859,96 @@ void ComputeTemperature(double ***temp, double ***temp2, double ****phi,
     }
 }
 
+void MovingFrame(double ****phi, double ***temp,
+                 double &T_right, double &T_left, double Tg,
+                 int &intpos, int &curst, int &frapass,
+                 int ndmx, int ndmy, int ndmz, int NDX, int NDY, int NDZ, double dx,
+                 int ix, int iy, int iz, int ii, int nm, int istep,
+                 double &int_temp)
+{
+    double sumplane = 0.0;
+    int hasS = 0;
+    int allS = 0;
+    // check if the bottom is solid
+    for (iy = 0; iy <= ndmy; iy++)
+    {
+        for (iz = 0; iz <= ndmz; iz++)
+        {
+            if (phi[0][0][iy][iz] != 0.0)
+            {
+                hasS = 0;
+            }
+            sumplane += phi[0][0][iy][iz];
+            if ((sumplane == 0.0) && (iy == ndmy) && (iz == ndmz))
+            {
+                hasS = 1;
+            }
+        }
+    }
+    // search interface front
+    if (hasS == 1)
+    {
+        allS = 1;
+        for (ix = 0; ix <= ndmx; ix++)
+        {
+            if (allS == 0)
+            {
+                intpos = ix - 1;
+                int_temp = temp[intpos][0][0];
+                break;
+            }
+            for (iy = 0; iy <= ndmy; iy++)
+            {
+                for (iz = 0; iz <= ndmz; iz++)
+                {
+                    if (phi[0][ix][iy][iz] > 0.0)
+                    {
+                        allS = 0;
+                        break;
+                    }
+                }
+                if (allS == 0)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (intpos > (NDX / 4))
+    {
+        frapass += 1;
+        curst = istep;
+        for (ix = 0; ix <= ndmx - 1; ix++)
+        {
+            for (iy = 0; iy <= ndmy; iy++)
+            {
+                for (iz = 0; iz <= ndmz; iz++)
+                {
+                    for (ii = 0; ii <= nm; ii++)
+                    {
+                        phi[ii][ix][iy][iz] = phi[ii][ix + 1][iy][iz];
+                    }
+                    temp[ix][iy][iz] = temp[ix + 1][iy][iz];
+                }
+            }
+        }
+        for (iy = 0; iy <= ndmy; iy++)
+        {
+            for (iz = 0; iz <= ndmz; iz++)
+            {
+                for (ii = 0; ii <= nm; ii++)
+                {
+                    phi[ii][ndmx][iy][iz] = phi[ii][ndmx - 1][iy][iz];
+                }
+                temp[ndmx][iy][iz] = temp[ndmx - 1][iy][iz] + Tg * dx;
+            }
+        }
+        T_left += Tg * dx;
+        T_right += Tg * dx;
+    }
+}
+
 void SavaData3D(double ****phi, int istep,
                 int NDX, int NDY, int NDZ,
                 int ndmx, int ndmy, int ndmz,

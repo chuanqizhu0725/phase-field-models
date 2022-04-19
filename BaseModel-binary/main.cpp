@@ -1,54 +1,43 @@
 
 #include "header.h"
 
-int N = 2;
+int N = 3;
 int NTH = 8;
-int NDX = 100;
-int NDY = 100;
-int NDZ = 100;
+int NDX = 128;
+int NDY = 32;
+int NDZ = 32;
 int ndmx = NDX - 1;
 int ndmy = NDY - 1;
 int ndmz = NDZ - 1;
 int nm = N - 1;
 
-int nstep = 1000001;
-int pstep = 100000;
-double dx = 1.0e-5;
-double dtime = 1.0e-6;
+// Test phase field coupled with concentration field
+int nstep = 2000;
+int pstep = 100;
+double dx = 1.0;
+double dtime = 1.0;
+double temp0 = 2.0;
 double delta = 5.0 * dx;
-double mobi = 1.0e-11;
+double mobi = 0.25;
 double astre = 0.00;
 double astrem = 0.0;
-double gamma0 = 0.5;
-double Tm = 1687.0;
-double sph_s = 2.29e6;
-double kap_s = 22.0;
-double sph_l = 2.53e6;
-double kap_l = 54.0;
-double Dts = kap_s / sph_s;
-double Dtl = kap_l / sph_l;
-double dH = 4.122e9;
+double gamma0 = 0.1;
+double S0 = 0.03;
+double Dcl = 0.1;
+double Dcs = 2.0e-4;
+double cl = 0.8;
 
-double Tg = 8.0e3;
-double Tv = 1.5e-4;
-double Tr = Tg * Tv;
-
-double temp0 = 1672.50;
-double T_left = temp0 - NDX / 4 * dx * Tg;
-double T_right = T_left + Tg * NDX * dx;
+double Te = 0.0;
+double ce = 0.5;
+double ml1 = -10.0;
+double kap1 = 0.2;
+double ml2 = 10.0;
+double kap2 = 0.2;
 
 int i, j, k, ni, nj;
 int xx0, yy0, zz0;
 double r0, r, c0;
 double M0, W0, A0;
-
-int intpos, dist, curpos, prepos, frapass;
-int curst, prest;
-double int_vel;
-double int_temp;
-
-CImg<unsigned char> phi_fldxy(NDX, NDY, 1, 3);
-char outFilePhi_xy[64];
 
 double ****phi, ****phi2;
 double ****conp, ***cont, ***cont2, ***temp, ***temp2;
@@ -145,19 +134,23 @@ int main(int argc, char *argv[])
     }
 
     PhaseProperties(delta, gamma0, mobi,
-                    A0, W0, M0,
-                    aij, wij, mij,
+                    A0, W0, M0, S0,
+                    aij, wij, mij, sij,
                     anij, thij, vpij, etaij,
                     ni, nj, nm);
 
-    CenterSeed(phi,
-               NDX, NDY, NDZ, ndmx, ndmy, ndmz,
-               i, j, k, nm,
-               NDX / 4, r, 0, NDY / 2, NDZ / 2);
+    TemperatureField(temp, temp0, phi,
+                     ndmx, ndmy, ndmz,
+                     i, j, k);
 
-    TemperatureGradient(temp, temp0, T_left, Tg,
-                        ndmx, ndmy, ndmz, dx,
-                        i, j, k);
+    PhaseField(phi,
+               NDX, NDY, NDZ, ndmx, ndmy, ndmz,
+               i, j, k, nm);
+
+    ConcnetrationField(phi, cont, conp, c0, temp,
+                       NDX, NDY, NDZ, ndmx, ndmy, ndmz,
+                       i, j, k, nm,
+                       cl, Te, ce, ml1, kap1, ml2, kap2);
 
     int rows = NDX / NTH;
 
@@ -177,8 +170,13 @@ int main(int argc, char *argv[])
         istep = 0;
 
     start:;
-
-#pragma omp barrier
+        if ((istep % pstep == 0) && (th_id == 0))
+        {
+            SavaConcentration3D(cont, istep,
+                                NDX, NDY, NDZ,
+                                ndmx, ndmy, ndmz,
+                                nm, i, j, k);
+        }
 
         CollectPhaseFields(phi, phiNum, phiIdx,
                            start, end, ndmx, ndmy, ndmz,
@@ -193,7 +191,7 @@ int main(int argc, char *argv[])
                            ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
                            ii, jj, kk, n1, n2, n3, nm,
                            pddtt, intsum, psum,
-                           conp, temp, dH, Tm, sph_s);
+                           conp, temp, Te, ce, ml1, ml2);
 
 #pragma omp barrier
 
@@ -213,10 +211,23 @@ int main(int argc, char *argv[])
 
 #pragma omp barrier
 
-        ComputeTemperature(temp, temp2, phi, T_right, T_left,
-                           start, end, ndmx, ndmy, ndmz, dtime, dx,
+        CollectPhaseFields(phi, phiNum, phiIdx,
+                           start, end, ndmx, ndmy, ndmz,
                            ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
-                           Dts, Dtl);
+                           phinum, nm);
+
+        SolutePartition(conp, cont, cont2, phi, temp,
+                        start, end, ndmx, ndmy, ndmz, dtime, dx,
+                        ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
+                        Te, ce, ml1, kap1, ml2, kap2);
+
+#pragma omp barrier
+
+        ComputeConcentration(conp, cont, cont2, phi,
+                             start, end, ndmx, ndmy, ndmz, dtime, dx,
+                             ix, iy, iz, ixp, ixm, iyp, iym, izp, izm,
+                             ii, nm, cddtt,
+                             Dcs, Dcl);
 
 #pragma omp barrier
 
@@ -226,65 +237,20 @@ int main(int argc, char *argv[])
             {
                 for (iz = 0; iz <= ndmz; iz++)
                 {
-                    temp[ix][iy][iz] = temp2[ix][iy][iz];
+                    cont[ix][iy][iz] = cont2[ix][iy][iz];
                 }
             }
         }
 
 #pragma omp barrier
-
-        if (th_id == 0)
-        {
-            T_left -= Tr * dtime;
-            T_right -= Tr * dtime;
-
-            MovingFrame(phi, temp,
-                        T_right, T_left, Tg,
-                        intpos, curst, frapass,
-                        ndmx, ndmy, ndmz, NDX, NDY, NDZ, dx,
-                        ix, iy, iz, ii, nm, istep,
-                        int_temp);
-        }
-
-        if ((istep % pstep == 0) && (th_id == 0))
-        {
-            curpos = intpos + frapass;
-            int_vel = double(curpos - prepos) * dx / double(curst - prest) / dtime;
-            prepos = curpos;
-            prest = curst;
-            // SavaData1D(phi, temp, istep,
-            //            NDX, NDY, NDZ,
-            //            ndmx, ndmy, ndmz,
-            //            nm, i, j, k);
-
-            // SavaData2D(phi, temp, istep,
-            //            NDX, NDY, NDZ,
-            //            ndmx, ndmy, ndmz,
-            //            nm, i, j, k);
-
-            SavaData3D(temp, istep,
-                       NDX, NDY, NDZ,
-                       ndmx, ndmy, ndmz,
-                       nm, i, j, k);
-
-            // ****** XY *******
-            cimg_forXY(phi_fldxy, x, y)
-            {
-                phi_fldxy(x, y, 0) = 255. * (phi[1][x][y][NDZ / 2]); // red
-                phi_fldxy(x, y, 1) = 255. * (phi[1][x][y][NDZ / 2]); // green
-                phi_fldxy(x, y, 2) = 255. * (phi[1][x][y][NDZ / 2]); // blue
-            }
-            sprintf(outFilePhi_xy, "figures/phi/2dxy%d.png", istep);
-            phi_fldxy.save_jpeg(outFilePhi_xy);
-
-            std::cout << istep * dtime << " s have passed!" << std::endl;
-            std::cout << "interface postion is: " << intpos << std::endl;
-            std::cout << "interface temperature is: " << int_temp << std::endl;
-            if (int_vel > 0.0 && int_vel < 1.0)
-            {
-                std::cout << "interface velocity is: " << int_vel << std::endl;
-            }
-        }
+        // if (th_id == 0)
+        // {
+        //     MovingFrame(phi, cont, conp, temp, Tg,
+        //                 intpos, curst, frapass,
+        //                 ndmx, ndmy, ndmz, NDX, NDY, NDZ, dx,
+        //                 ix, iy, iz, ii, nm, istep,
+        //                 int_temp);
+        // }
         istep++;
         if (istep < nstep)
         {

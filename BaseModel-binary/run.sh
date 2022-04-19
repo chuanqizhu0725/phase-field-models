@@ -5,8 +5,8 @@ main.cpp -o main \
 data/phi/*.vtk \
 data/phi/*.csv \
 data/con/*.csv \
+data/con/*.vtk \
 data/temp/*.csv \
-data/temp/*.vtk \
 data/interface/*.csv \
 data/fraction/*.csv \
 figures/phi/*.png \
@@ -14,4 +14,4 @@ figures/con/*.png \
 figures/temp/*.png \
 && ./main \
 && rm main \
-# && python plot2d.py
+&& python plot2d.py
