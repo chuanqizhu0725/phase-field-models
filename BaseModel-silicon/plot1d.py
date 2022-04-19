@@ -4,23 +4,16 @@ import matplotlib.pyplot as plt
 
 nx = 128
 ny = 1
-ns = 10
+ns = 100000
 step_arr = np.arange(0, ns*10, ns)
 for step in step_arr:
     df = pd.read_csv(f"data/phi/1d{step}.csv", header=None)
-    arr = df.values
-    plt.plot(arr)
-    plt.savefig(f"figures/phi/1d{step}.png")
-    plt.close()
-
-    # dfc = pd.read_csv(f"data/con/1d{step}.csv", header=None)
-    # arrc = dfc.values
-    # plt.plot(arrc)
-    # plt.savefig(f"figures/con/1d{step}.png")
-    # plt.close()
-
+    arr = df[0].values
     dft = pd.read_csv(f"data/temp/1d{step}.csv", header=None)
-    arrt = dft.values
-    plt.plot(arrt)
-    plt.savefig(f"figures/temp/1d{step}.png")
+    arrt = dft[0].values
+    fig, ax1 = plt.subplots()
+    ax1.plot(arr, color="blue")
+    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    ax2.plot(arrt, color="red")
+    plt.savefig(f"figures/phi/1d{step}")
     plt.close()
